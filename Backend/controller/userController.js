@@ -2,6 +2,8 @@ const User = require('../models/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
+const { default: validateEditData } = require('../middleware/validateEditData');
+const { json } = require('express');
 
 const registerUser = async (req, res) => { 
     try{
@@ -95,18 +97,56 @@ const getProfile = async (req,res)=>{
 const editProfile=async (req,res)=>{   
     try{
         const user=req.user;
+        if(!validateEditData(req)){
+            return res.status(400).json({message:'Invalid fields in request body'});
+        }
         const {name,phone,address,dob,gender}=req.body;
-        const imageFile=req.file;
-
         if(!name || !phone || !address || !dob || !gender){
             return res.status(400).json({message:'All fields are required'});
-        }   
-        
+        }
+        await User.findByIdAndUpdate(user._id,{name,phone,
+            address:json.parse(address),
+            dob,
+            gender
+        })
+
+        await user.save();
+        res.status(200).json({message:'User profile updated successfully'});
     }
     catch(error){       
         res.status(500).json({message:'Error editing user profile',error:error.message});
     }
 }
 
+const uploadProfilePicture=async (req,res)=>{
+    try{
+        const user=req.user;
+        if(!req.file){
+            return res.status(400).json({message:'No file uploaded'});
+        }
 
-module.exports = { registerUser, loginUser, getProfile };
+        if(user.image && user.image!=="https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM="){
+            // delete the previous profile picture from cloudinary
+            const publicId=user.image.split('/').slice(-1)[0].split('.')[0];
+            await cloudinary.uploader.destroy(publicId);    
+        }           
+        // upload the new profile picture to cloudinary
+        const result=await cloudinary.uploader.upload(req.file.path,{
+            folder:'profile_pictures',
+            width:500,
+            height:500,
+            crop:'fill'
+        });
+        user.image=result.secure_url;
+        await user.save();
+        res.status(200).json({message:'Profile picture uploaded successfully',imageUrl:result.secure_url});
+    }
+    catch(error){
+        res.status(500).json({message:'Error uploading profile picture',error:error.message});
+    }   
+}
+
+
+
+
+module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture };        
