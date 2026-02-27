@@ -72,8 +72,8 @@ const doctorSchema =new mongoose.Schema({
         type:String,
         default:"Not selected",
         enum:{
-            values:["Male","Female  ","Other","Not selected"],
-            message:`${VALUE} is not supported`
+            values:["Male","Female","Other","Not selected"],
+            message:'{VALUE} is not supported'
         }
     },
 
@@ -99,4 +99,4 @@ const doctorSchema =new mongoose.Schema({
 
 const Doctor = mongoose.model('Doctor', doctorSchema);
 
-module.exports = { Doctor };
+module.exports = {Doctor};

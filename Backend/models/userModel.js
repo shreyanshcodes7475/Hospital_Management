@@ -36,8 +36,8 @@ const userSchema=new mongoose.Schema({
         type:String,
         default:"Not selected",
         enum:{
-            values:["Male","Female  ","Other","Not selected"],
-            message:`${VALUE} is not supported`
+            values:["Male","Female","Other","Not selected"],
+            message:'{VALUE} is not supported'
         }
     },
 
@@ -62,4 +62,4 @@ const userSchema=new mongoose.Schema({
 
 const User=mongoose.model('User',userSchema);
 
-module.exports={User};
+module.exports=User;
