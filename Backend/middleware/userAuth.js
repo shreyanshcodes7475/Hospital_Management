@@ -16,7 +16,6 @@ const userAuth=async (req,res,next)=>{
     const {_id}=decodedobj;
     
     const user=await User.findById(_id).select('-password');
-    console.log(user);
     if(!user){
         return res.status(401).json({message:'Unauthorized'});
     }

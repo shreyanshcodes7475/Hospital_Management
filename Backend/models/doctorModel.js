@@ -20,7 +20,7 @@ const doctorSchema =new mongoose.Schema({
         required:true
     },
 
-    speciality:{
+    specialization:{
         type:String,
         required:true   
     },
@@ -31,7 +31,7 @@ const doctorSchema =new mongoose.Schema({
     }, 
 
     experience:{ 
-        type:Number,
+        type:String,
         required:true   
     },
 
@@ -61,11 +61,6 @@ const doctorSchema =new mongoose.Schema({
             postal_code:"",
             country:""
         }
-    },
-
-    date:{
-        type:Number,
-        required:true
     },
 
     gender:{
@@ -99,4 +94,4 @@ const doctorSchema =new mongoose.Schema({
 
 const Doctor = mongoose.model('Doctor', doctorSchema);
 
-module.exports = {Doctor};
+module.exports = Doctor;

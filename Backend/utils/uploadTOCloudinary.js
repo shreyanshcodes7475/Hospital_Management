@@ -3,7 +3,9 @@ const streamfiery = require("streamifier");
 
 const uploadToCloudinary = async (buffer) => {
     return new Promise((resolve,reject)=>{
-        const uploadStream=cloudinary.uploader.upload_stream((error,result)=>{
+        const uploadStream=cloudinary.uploader.upload_stream(
+            {folder:"profilePicture"},
+            (error,result)=>{
             if(error) return reject(error);
             resolve(result);    
         })
@@ -12,4 +14,4 @@ const uploadToCloudinary = async (buffer) => {
 }
 
 
-export default uploadToCloudinary;
+module.exports = { uploadToCloudinary };

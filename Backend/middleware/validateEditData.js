@@ -1,11 +1,17 @@
-const validateEditData=(res)=>{
+const validateUserEditData=(req)=>{
     
-    const allowedFields=['name','phone','address','dob','gender'];
-
+    const allowedFields=['phone','address','dob','gender'];
+    
     return Object.keys(req.body).every((field)=>{
-        allowedFields.includes(field);  
+        return allowedFields.includes(field);
     })
-
-
 } 
-export default validateEditData;
+
+
+const ValidateDoctorEditData=(req)=>{
+    const allowedFields=['phone','address','fees','about'];
+    return Object.keys(req.body).every((field)=>{
+        return allowedFields.includes(field);
+    })
+}
+module.exports = { validateUserEditData, ValidateDoctorEditData };
