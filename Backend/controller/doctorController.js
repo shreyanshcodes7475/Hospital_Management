@@ -1,4 +1,4 @@
-const { Doctor } = require('../models/doctorModel');
+const Doctor = require('../models/doctorModel');
 const bcrypt=require('bcrypt');
 const jwt=require('jsonwebtoken');
 const validator=require('validator');
@@ -6,6 +6,9 @@ const Appointment = require('../models/appointmentModel');
 const { userAuth } = require('../middleware/userAuth');
 const { User } = require('../models/userModel');
 const { ValidateDoctorEditData } = require('../middleware/validateEditData');
+const cloudinary=require("../config/cloudinary")
+const uploadToCloudinary = require('../utils/uploadTOCloudinary');
+const {getPublicIdFromUrl}=require("../controller/userController")
 
 // login---
 const loginDoctor = async(req, res) => {       
@@ -39,9 +42,9 @@ const loginDoctor = async(req, res) => {
 const changeAvailability=async (req,res)=>{
     try{
         const doctor=req.doctor;
-        doctor.availability=!doctor.availability;
+        doctor.available=!doctor.available;
         await doctor.save();
-        res.status(200).json({success:true,message:'Doctor availability changed successfully',availability:doctor.availability});   
+        res.status(200).json({success:true,message:'Doctor availability changed successfully',available:doctor.available});   
     }
     catch(error){
         res.status(500).json({ success:false,message: 'Error changing doctor availability', error: error.message });
@@ -73,13 +76,56 @@ const updateProfile=async (req,res)=>{
         }
 
         const {phone,address,fees,about}=req.body;
-        await Doctor.findByIdAndUpdate(doctor._id,{phone,address,fees,about},{new:true});
-        res.status(200).json({success:true,message:'Doctor profile updated successfully'}); 
+        const updatedDoctor=await Doctor.findByIdAndUpdate(doctor._id,{phone,address,fees,about},{new:true});
+        res.status(200).json({success:true,message:'Doctor profile updated successfully',updatedDoctor}); 
     }
     catch(error){
         res.status(500).json({ 
             success:false,
             message: 'Error updating doctor profile', error: error.message });  
+    }
+}
+
+// update profile picture
+const uploadProfilePicture=async(req,res)=>{
+    try{
+        const doctor=req.doctor;
+        if(!req.file){
+            return res.status(400).json({
+                success:false,
+                message:"No file are uploaded"
+            })
+        }
+
+        if(doctor.image && doctor.image!=="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTjOUpYEb4Vm2qeuKKsBkcfkd886b_GtspcFQ&s"){
+            // delete the previous image
+            const publicId =getPublicIdFromUrl(doctor.image);
+            await cloudinary.uploader.destroy(publicId);
+        }
+
+        // upload the new profile picture
+        const base64=req.file.buffer.toString("base64");
+        const result=await cloudinary.uploader.upload(`data:${req.file.mimetype};base64,${base64}`,{
+            folder:'profilepicture',
+            width:500,
+            height:500,
+            crop:'fill'
+        })
+        console.log(result);
+        doctor.image=result.secure_url;
+        await doctor.save();
+        res.status(200).json({
+            success:true,
+            message:'Profile picture uploaded successfully',
+            imageUrl:result.secure_url
+        })
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:"Error uploading profile picture",
+            error:error.message
+        })
     }
 }
 
@@ -97,16 +143,31 @@ const appointmentList=async (req,res)=>{
     }
 }
 
+// appointment complete api
 const appointmentComplete=async (req,res)=>{
     try{
         const doctor=req.doctor;
-        const {appointmentId}=req.body;
+        const appointmentId=req.params.id;
         const appointment=await Appointment.findById(appointmentId);
         if(!appointment){
             return res.status(404).json({success:false,message:'Appointment not found'});
         }
         if(appointment.docId.toString()!==doctor._id.toString()){
-            return res.status(401).json({success:false,message:'Unauthorized'});
+            return res.status(401).json({success:false,message:'Unauthorized to complete it'});
+        }
+
+        if(appointment.cancelled){
+            return res.status(401).json({
+                success:false,
+                message:"Appointment is already cancelled"
+
+            })
+        }
+        if(appointment.isCompleted){
+            return res.status(200).json({
+                success:true,
+                message:"Appointment marked as completed"
+            })
         }
         appointment.isCompleted=true;
         await appointment.save();
@@ -119,17 +180,32 @@ const appointmentComplete=async (req,res)=>{
     }
 }
 
+// appointment cancel api
 const appointmentCancel=async (req,res)=>{
     try{
         const doctor=req.doctor;
-        const {appointmentId}=req.body;
+        const appointmentId=req.params.id;
         const appointment=await Appointment.findById(appointmentId);
         if(!appointment){
             return res.status(404).json({success:false,message:'Appointment not found'});
         }  
 
         if(appointment.docId.toString()!==doctor._id.toString()){
-            return res.status(401).json({success:false,message:'Unauthorized'});
+            return res.status(401).json({success:false,message:'Unauthorized to cancel it'});
+        }
+
+        if(appointment.isCompleted){
+            return res.status(401).json({
+                success:false,
+                message:"Appointment already completed"
+            })
+        }
+
+        if(appointment.cancelled){
+            return res.status(200).json({
+                success:true,
+                message:"Appointment cancelled successfully"
+            })
         }
         appointment.cancelled=true;
         await appointment.save();
@@ -143,5 +219,5 @@ const appointmentCancel=async (req,res)=>{
     }
 }
 
-module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel };
+module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture };
 

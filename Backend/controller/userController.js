@@ -177,7 +177,6 @@ const uploadProfilePicture=async (req,res)=>{
             height:500,
             crop:'fill'
         });
-        console.log(result);
         user.image=result.secure_url;
         await user.save();
         res.status(200).json({
@@ -198,7 +197,6 @@ const bookAppointment=async (req,res)=>{
     try{
         const {docId, slotDate, slotTime}=req.body;
         const user=req.user;
-        // console.log(user);
         if(!docId || !slotDate || !slotTime){
             return res.status(400).json({
                 success:false,
@@ -341,4 +339,4 @@ const cancelAppointment=async (req,res)=>{
 
 
 
-module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment };        
+module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl};        
