@@ -1,6 +1,6 @@
 const express = require('express');
 const doctorrouter = express.Router();
-const { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture } = require('../controller/doctorController');   
+const { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture, doctorDashboard } = require('../controller/doctorController');   
 const {doctorAuth}=require('../middleware/DoctorAuth');
 const { upload } = require('../middleware/multer');
 
@@ -13,5 +13,6 @@ doctorrouter.post('/upload-profile-picture', doctorAuth,upload.single('profilePi
 doctorrouter.get('/appointments', doctorAuth, appointmentList); 
 doctorrouter.post('/appointments/:id/complete',doctorAuth, appointmentComplete);
 doctorrouter.post('/appointments/:id/cancel',doctorAuth, appointmentCancel);
+doctorrouter.get('/dashboard', doctorAuth,doctorDashboard)
 
 module.exports = {doctorrouter};

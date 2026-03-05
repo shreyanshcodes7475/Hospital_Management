@@ -85,6 +85,11 @@ const doctorSchema =new mongoose.Schema({
     slots_booked:{
         type:Object,
         default:{}
+    },
+
+    earning:{
+        type:Number,
+        default:0
     }
 }, {
     timestamps:true,

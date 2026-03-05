@@ -219,5 +219,45 @@ const appointmentCancel=async (req,res)=>{
     }
 }
 
-module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture };
+const doctorDashboard= async (req,res)=>{
+try{
+
+    const page=Math.max(Number(req.query.page || 1), 1)
+    const limit=Math.min(Number(req.query.limit || 5),50)
+    const skip=(page-1)*limit;
+
+    const doctor=req.doctor;
+    let earnings=0;
+    const appointments=await Appointment.find({docId:doctor._id}).skip(skip).limit(limit);
+
+    let patients=[];
+
+    appointments.map((item)=>{
+        if(!patients.includes(item.userId)){
+            patients.push(item.userId);
+        }
+    })
+
+    const dashboard={
+        appointmentList:appointments,
+        appointments:appointments.length,
+        patients:patients.length
+    }
+
+    res.status(200).json({
+        success:true,
+        dashboard,
+        message:"Dashboard data fetched succesfully"
+    })
+    }
+    catch(error){
+        res.json({
+            success:true,
+            message:error.message
+        })
+    }
+}
+
+
+module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture,doctorDashboard };
 
