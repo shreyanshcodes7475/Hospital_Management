@@ -7,6 +7,17 @@ const cookieParser = require('cookie-parser');
 const { userRouter } = require('./routes/userRoute');
 const { doctorrouter } = require('./routes/doctorRoute'); 
 const { adminRouter } = require("./routes/adminRoute");
+const cors=require("cors")
+
+
+app.use(cors());
+
+app.use(cors({
+  origin: 'http://localhost:5173', // Allow requests from this origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+  credentials: true // Allow cookies to be sent with requests 
+}))
 
 app.use(express.json()); // req wali body ko json me convert krne ke liye
 app.use(cookieParser());
@@ -16,6 +27,10 @@ app.use('/api/doctors', doctorrouter);
 app.get('/', (req, res) => {
   res.send('api working !');
 });
+
+
+
+
 
 connectDb().then(()=>{
   console.log("Connected to MongoDB");
