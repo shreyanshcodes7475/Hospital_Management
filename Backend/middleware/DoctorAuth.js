@@ -17,7 +17,6 @@ const doctorAuth=async (req,res,next)=>{
     }
     req.doctor=doctor; //to take doctor so that we can use it in other routes
     next(); 
-
 }
 
 module.exports={doctorAuth};

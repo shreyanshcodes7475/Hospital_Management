@@ -8,7 +8,9 @@ const Doctor = require('../models/doctorModel');
 const cloudinary = require('../config/cloudinary');
 const uploadToCloudinary = require('../utils/uploadTOCloudinary');
 const Appointment = require('../models/appointmentModel');
-const fs = require('fs');
+const fs = require('fs')
+const oAuth2Client = require('google-auth-library').OAuth2Client;
+const client = new oAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 
 const registerUser = async (req, res) => { 
@@ -48,7 +50,8 @@ const registerUser = async (req, res) => {
         res.status(201).json({ 
             success:true,
             message: 'User registered successfully',
-            token:token });
+            token:token 
+        });
     }
     catch(error){
         console.log(error);
@@ -96,6 +99,83 @@ const loginUser = async (req, res) => {
 
     }
 }
+
+
+// api for user logout
+const LogoutUser=async(req,res)=>{
+    try{
+        const token=req.cookies.token;
+        if(!token){
+            return res.status(400).json({success:false,message:'No token found'});
+        }  
+        
+        token.expiresIn(date.now());
+        res.clearCookie('token');
+        res.status(200).json({
+            success:true,
+            message:'User logged out successfully'
+        }); 
+
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:'Error logging out user',error:error.message
+        });
+    }
+}
+
+// api for google login
+
+const googlelogin=async(req,res)=>{
+try{
+        const {token}=req.body;
+        console.log(token);
+        if(!token){
+            return res.status(400).json({success:false,message:'Google token is required'});
+        }
+
+        const ticket =await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID
+        })
+
+        if(!ticket){
+            return res.status(400).json({success:false,message:'Invalid Google token'});
+        }
+
+
+
+        const {name, email}=ticket.getPayload();
+
+        let user=await User.findOne({email});
+        if(!user){
+            user =await User.create({ 
+                name,
+                email,
+                isGoogleUser:true
+            })
+            await user.save();
+        }
+
+        const token1=jwt.sign({_id:user._id}, process.env.JWT_SECRET, {expiresIn:'30d'});
+        res.cookie('token', token1,{
+            httpOnly:true,
+            secure:true,
+        })
+        
+        res.json({
+            message:"Login Successfull",
+            success:true,
+        })
+    }
+    catch(err){
+        console.log(err);
+        res.status(500).json({message:"Invalid Google Token", success:false});
+    }
+}
+
+
 
 // api to get user profile
 const getProfile = async (req,res)=>{
@@ -339,4 +419,4 @@ const cancelAppointment=async (req,res)=>{
 
 
 
-module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl};        
+module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl, googlelogin};        

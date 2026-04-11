@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import BASE_URL from '../constants/BASE_URL';
+import BASE_URL from '../constants/Base_url';
 import { GoogleLogin } from "@react-oauth/google";
-
+import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
+  const navigate = useNavigate();
   const [userType, setUserType] = useState('patient');
   const [formData, setFormData] = useState({
     email: 'Prashant@gmail.com',
@@ -29,16 +30,17 @@ export default function Login() {
 
   const handleGoogleLogin=async(credentialResponse)=>{
     try{
-      const response = await fetch(`{BASE_URL}/users/google-login`,{
+      const response = await fetch(`${BASE_URL}/users/google-login`,{
         method:'POST',
         headers:{'content-type':'application/json'},
+        credentials:'include',
         body:JSON.stringify({token:credentialResponse.credential})
-
       })
-
+      const data = await response.json();
+      navigate('/dashboard');
     }
     catch(err){
-      console.error('Google login failed:',err);
+      console.log('Google login failed:',err);
     }
   }
 
@@ -56,6 +58,7 @@ export default function Login() {
       console.log(`${userType} login:`, formData);
       const response = await fetch(`${BASE_URL}/users/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
