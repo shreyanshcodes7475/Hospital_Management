@@ -1,190 +1,214 @@
-import { useState } from 'react';
-import BASE_URL from '../constants/Base_url';
-import { GoogleLogin } from "@react-oauth/google";
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import BASE_URL from '../constants/BASE_URL'
+import { GoogleLogin } from '@react-oauth/google'
 
 export default function Login() {
-  const navigate = useNavigate();
-  const [userType, setUserType] = useState('patient');
+  const navigate = useNavigate()
+  const { login } = useAuth()
+  const [userType, setUserType] = useState('patient')
   const [formData, setFormData] = useState({
-    email: 'Prashant@gmail.com',
-    password: 'Prashant@123',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+    email: '',
+    password: '',
+  })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleUserTypeChange = (type) => {
-    setUserType(type);
-    setFormData({ email: '', password: '' });
-    setError('');
-  };
+    setUserType(type)
+    setFormData({ email: '', password: '' })
+    setError('')
+  }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value } = e.target
     setFormData({
       ...formData,
       [name]: value,
-    }); 
-    setError('');
-  };
+    })
+    setError('')
+  }
 
-  const handleGoogleLogin=async(credentialResponse)=>{
-    try{
-      const response = await fetch(`${BASE_URL}/users/google-login`,{
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        credentials:'include',
-        body:JSON.stringify({token:credentialResponse.credential})
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${BASE_URL}/users/google-login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token: credentialResponse.credential }),
       })
-      const data = await response.json();
-      navigate('/dashboard');
-    }
-    catch(err){
-      console.log('Google login failed:',err);
+      const data = await response.json()
+      console.log('Google login response:', data);
+      
+      if(!response.ok) {
+        setError(data.message || 'Google login failed')
+        setLoading(false)
+        return
+      }
+      
+      login(data.user, userType)
+      navigate('/home')
+    } catch (err) {
+      console.error('Google login error:', err)
+      setError('Google login failed. Please try again.')
+      setLoading(false)
     }
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      return;
+      setError('Please fill in all fields')
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      // API call will be integrated here
-      console.log(`${userType} login:`, formData);
-      const response = await fetch(`${BASE_URL}/users/login`, {
+        const response = await fetch(`${BASE_URL}/users/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      // Handle response...
-      const data = await response.json();
-      console.log('Login response:', data);
-      setLoading(false);
+        body: JSON.stringify({ ...formData, userType }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.message || 'Login failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      login(data.user, userType)
+      navigate('/home')
     } catch (err) {
-      setError('Login failed. Please try again.');
-      setLoading(false);
+      setError('Login failed. Please try again.')
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-10 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Hospital Management System</h1>
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-teal-600/20 via-cyan-600/10 to-gray-900 pointer-events-none"></div>
 
-        {/* Toggle Buttons */}
-        <div className="flex gap-2 mb-8 bg-gray-100 p-1 rounded-lg">
-          <button
-            className={`flex-1 py-3 px-4 rounded-md font-semibold text-sm transition-all duration-300 ${
-              userType === 'patient'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-transparent text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => handleUserTypeChange('patient')}
-          >
-            Patient
-          </button>
-          <button
-            className={`flex-1 py-3 px-4 rounded-md font-semibold text-sm transition-all duration-300 ${
-              userType === 'doctor'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-transparent text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => handleUserTypeChange('doctor')}
-          >
-            Doctor
-          </button>
-          <button
-            className={`flex-1 py-3 px-4 rounded-md font-semibold text-sm transition-all duration-300 ${
-              userType === 'admin'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-transparent text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => handleUserTypeChange('admin')}
-          >
-            Admin
-          </button>
+      <div className="relative w-full max-w-md">
+        {/* Card */}
+        <div className="bg-gray-800/50 backdrop-blur border border-teal-500/30 rounded-2xl p-8 shadow-2xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl mb-4">
+              <span className="text-2xl">🏥</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">DocLink</h1>
+            <p className="text-gray-400">Sign in to your account</p>
+          </div>
+
+          {/* User Type Toggle */}
+          <div className="flex gap-2 mb-8 bg-gray-700/50 p-1 rounded-lg border border-gray-600">
+            <button
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-300 ${
+                userType === 'patient'
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-300 bg-transparent'
+              }`}
+              onClick={() => handleUserTypeChange('patient')}
+            >
+              Patient
+            </button>
+            <button
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-300 ${
+                userType === 'doctor'
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-300 bg-transparent'
+              }`}
+              onClick={() => handleUserTypeChange('doctor')}
+            >
+              Doctor
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="you@example.com"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:bg-gray-700 transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:bg-gray-700 transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 mt-6 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center">
+            <div className="flex-1 border-t border-gray-600"></div>
+            <span className="px-3 text-gray-500 text-sm">or</span>
+            <div className="flex-1 border-t border-gray-600"></div>
+          </div>
+
+          {/* Google Login - Only for Patients */}
+          {userType === 'patient' && (
+            <div className="mb-6 flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => setError('Google login failed')}
+                text="signin_with"
+              />
+            </div>
+          )}
+
+          {/* Footer Links */}
+          <div className="space-y-3 text-center">
+            <p className="text-gray-400 text-sm">
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+                Sign up here
+              </Link>
+            </p>
+            <a href="#" className="text-gray-500 hover:text-gray-400 text-sm transition-colors">
+              Forgot password?
+            </a>
+          </div>
         </div>
 
-        {/* Role Title */}
-        <h2 className="text-center text-blue-500 text-xl font-semibold mb-6">
-          {userType.charAt(0).toUpperCase() + userType.slice(1)} Login
-        </h2>
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm border-l-4 border-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Login Form */}
-        <form onSubmit={handleSubmit}>
-          <div className="mb-5">
-            <label htmlFor="email" className="block text-gray-800 font-semibold text-sm mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder="Enter your email"
-              required
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
-            />
-          </div>
-
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-800 font-semibold text-sm mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="Enter your password"
-              required
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-3 rounded-lg hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200"
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-
-        <p className="text-center mt-6 text-gray-600 text-sm">
-          Don't have an account?{' '}
-          <a href="/signup" className="text-blue-500 font-semibold hover:text-purple-600 hover:underline transition-colors">
-            Sign Up here
-          </a>
-        </p>
-
-        <div className='my-5 flex justify-center'>
-          <GoogleLogin
-            onSuccess={(credentialResponse) => {
-              console.log(credentialResponse);
-              handleGoogleLogin(credentialResponse);
-            }}
-            onError={() => {
-              console.log("Login Failed");
-            }}
-          />
-        </div>
-      </div>  
+        {/* Decorative elements */}
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      </div>
     </div>
-  );
+  )
 }

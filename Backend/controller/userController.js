@@ -63,6 +63,33 @@ const registerUser = async (req, res) => {
 }
 
 
+
+// api to check if user is authenticated
+const isAuthenticated=async(req,res)=>{
+    try{
+        const user=req.user;
+        if(!user){
+            return res.status(401).json({
+                success:false,
+                authenticated:false,
+                message:'Unauthorized'
+            });
+        }
+        res.status(200).json({
+            success:true,
+            authenticated:true,
+            message:'User is authenticated',
+            user
+        });
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message: 'Error checking authentication', error: error.message
+        });
+    }
+}
+
 // API FOR USER LOGIN
 const loginUser = async (req, res) => {
     try{
@@ -106,7 +133,7 @@ const LogoutUser=async(req,res)=>{
     try{
         const token=req.cookies.token;
         if(!token){
-            return res.status(400).json({success:false,message:'No token found'});
+            return res.status(400).json({success:false,message:'Please login first'});
         }  
         
         token.expiresIn(date.now());
@@ -167,6 +194,12 @@ try{
         res.json({
             message:"Login Successfull",
             success:true,
+        user:{                         // ✅ Add kar - user object
+            _id:user._id,
+            name:user.name,
+            email:user.email,
+            isGoogleUser:user.isGoogleUser
+        }
         })
     }
     catch(err){
@@ -286,7 +319,8 @@ const bookAppointment=async (req,res)=>{
         if(!docData){
             return res.status(404).json({
                 success:false,
-                message:'Doctor not found'});
+                message:'Doctor not found'
+            });
         }
 
         const UpdatedDoctor=await Doctor.findOneAndUpdate({
@@ -306,7 +340,8 @@ const bookAppointment=async (req,res)=>{
     if(!UpdatedDoctor){
         return res.status(400).json({
             success:false,
-            message:'Selected slot is not available'});
+            message:'Selected slot is not available, please choose another slot'
+        });
     }
 
 
@@ -322,14 +357,62 @@ const bookAppointment=async (req,res)=>{
         date:Date.now()
     }
 
+
+
     const newAppointment=await new Appointment(appointment);
     await newAppointment.save();
+
+    // after 5mins if the appointment is not paid then cancel the appointment and release the booked slot by cron job
     res.status(200).json({
         success:true,
         message:'Appointment booked successfully'});
     }
+
+
+    
     catch(error){  
         res.status(500).json({success:false,message:'Error booking appointment',error:error.message});
+    }
+}
+
+// check avaiilability of doctor slot
+const checkSlotAvailability=async (req,res)=>{
+    try{
+        const {docId, slotDate, slotTime}=req.body;
+        if(!docId || !slotDate || !slotTime){
+            return res.status(400).json({
+                success:false,
+                message:'Doctor ID, slot date and slot time are required'});
+        }
+
+        const doctor=await Doctor.findById(docId);
+        if(!doctor){
+            return res.status(404).json({
+                success:false,
+                message:'Doctor not found'
+            });
+        }
+
+        if(doctor.slots_booked && doctor.slots_booked[slotDate] && doctor.slots_booked[slotDate].includes(slotTime)){
+            return res.status(200).json({
+                success:true,
+                available:false,
+                message:'Selected slot is not available'
+            });
+        }
+
+        res.status(200).json({
+            success:true,
+            available:true,
+            message:'Selected slot is available'
+        }); 
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:'Error checking slot availability',error:error.message
+        }); 
+
     }
 }
 
@@ -368,7 +451,8 @@ const cancelAppointment=async (req,res)=>{
         if(!appointmentData){
             return res.status(404).json({
                 success:false,
-                message:'Appointment not found'});
+                message:'Appointment not found'
+            });
         }
 
         if(appointmentData.userId.toString()!==user._id.toString()){  
@@ -386,14 +470,15 @@ const cancelAppointment=async (req,res)=>{
        if(!appointment){
         return res.status(400).json({
             success:false,
-            message:'Error cancelling appointment'});
+            message:'Error cancelling appointment'
+        });
        }    
        
        const {docId, slotDate, slotTime}=appointmentData;
-     //another approach to remove the booked slot from doctor's slots_booked array  
-    //    await Doctor.findByIdAndUpdate(docId,{
-    //     $pull:{[`slots_booked.${slotDate}`]:slotTime}
-    //    })
+        //another approach to remove the booked slot from doctor's slots_booked array  
+        //    await Doctor.findByIdAndUpdate(docId,{
+        //     $pull:{[`slots_booked.${slotDate}`]:slotTime}
+        //    })
 
        const doctorData=await Doctor.findById(docId);
        let slots_booked=doctorData.slots_booked || [];
@@ -418,5 +503,4 @@ const cancelAppointment=async (req,res)=>{
 
 
 
-
-module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl, googlelogin};        
+module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl, googlelogin,isAuthenticated, LogoutUser, checkSlotAvailability};        

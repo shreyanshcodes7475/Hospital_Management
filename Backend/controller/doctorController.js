@@ -259,5 +259,7 @@ try{
 }
 
 
+
+
 module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture,doctorDashboard };
 

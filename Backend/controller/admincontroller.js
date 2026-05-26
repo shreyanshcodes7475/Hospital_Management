@@ -83,10 +83,31 @@ const adminLogin=async (req,res)=>{
 
 const allDoctors=async (req,res)=>{
     try{
-        const doctors=await Doctor.find({});
+        const page=parseInt(req.query.page) || 1;
+        const limit=parseInt(req.query.limit) || 10;
+        const skip=(page-1)*limit;
+
+        const total=await Doctor.countDocuments({});
+        const totalPages=Math.ceil(total/limit);
+        const specialization_filter=req.query.specialization || "";
+        const location_filter=req.query.location || "";
+        
+        const query={};
+        if(specialization_filter?.trim()){
+            query.specialization={$regex:specialization_filter.trim(), $options:'i'};
+        }
+
+        if(location_filter?.trim()){
+            query["address.city"]={$regex:location_filter.trim(), $options:'i'};
+        }
+        
+        const doctors=await Doctor.find(query).skip(skip).limit(limit);
         res.json({
             success:true,
-            doctors
+            doctors,
+            total,
+            totalPages,
+            currentPage: page
         })
     }
     catch(error){

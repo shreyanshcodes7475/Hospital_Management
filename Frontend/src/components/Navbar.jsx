@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const { isAuthenticated, logout } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -71,27 +71,32 @@ export default function Navbar() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            {isAuthenticated ? (
-              <button
-                onClick={handleLogout}
-                className="px-6 py-2 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
-              >
-                Logout
-              </button>
+            {user ? (
+              <div className="flex items-center space-x-3 bg-white/10 px-4 py-2 rounded-full hover:bg-white/20 transition-all duration-300">
+                <img
+                  src={user.image || "https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM="}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full border-2 border-white object-cover hover:scale-110 transition-transform duration-200"
+                />
+                <span className="text-white font-medium">
+                  {user.name || 'User'}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-6 py-2 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
+                >
+                  Logout
+                </button>
+              </div>
             ) : (
               <>
                 <Link
                   to="/login"
                   className="px-6 py-2 text-white font-semibold hover:text-blue-100 transition-colors"
                 >
-                  Login
+                  Login/SignUp
                 </Link>
-                <Link
-                  to="/signup"
-                  className="px-6 py-2 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
-                >
-                  Sign Up
-                </Link>
+
               </>
             )}
           </div>
