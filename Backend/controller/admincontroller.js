@@ -47,10 +47,13 @@ const addDoctor = async(req, res) => {
         password:hashedPassword,
         fees,
         experience,
-        specialization,
+        specialization:specialization.toLowerCase().trim(),
         degree,
-        address,
-        gender
+        address:{
+            city: address.city.toLowerCase().trim(),
+            state: address.state.toLowerCase().trim()
+        },
+        gender:gender.toLowerCase().trim()  
     });
     await doctor.save();
     return res.status(201).json({
@@ -98,7 +101,7 @@ const allDoctors=async (req,res)=>{
         }
 
         if(location_filter?.trim()){
-            query["address.city"]={$regex:location_filter.trim(), $options:'i'};
+            query["address.city"]={$regex:location_filter.toLowerCase().trim(), $options:'i'};
         }
         
         const doctors=await Doctor.find(query).skip(skip).limit(limit);

@@ -1,6 +1,6 @@
 const validateUserEditData=(req)=>{
     
-    const allowedFields=['phone','address','dob','gender'];
+    const allowedFields=['phone','address','dob','gender', "name"];
     
     return Object.keys(req.body).every((field)=>{
         return allowedFields.includes(field);

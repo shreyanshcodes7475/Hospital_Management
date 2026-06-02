@@ -40,7 +40,7 @@ const registerUser = async (req, res) => {
 
         // Create a new user
         const newUser = await new User({
-            name,
+            name:name.toLowerCase().trim(),
             email,
             password: hashedPassword
         });
@@ -178,7 +178,7 @@ try{
         let user=await User.findOne({email});
         if(!user){
             user =await User.create({ 
-                name,
+                name:name.toLowerCase().trim(),
                 email,
                 isGoogleUser:true
             })
@@ -194,7 +194,7 @@ try{
         res.json({
             message:"Login Successfull",
             success:true,
-        user:{                         // ✅ Add kar - user object
+        user:{                        
             _id:user._id,
             name:user.name,
             email:user.email,
@@ -217,9 +217,20 @@ const getProfile = async (req,res)=>{
         if(!user){
             return res.status(404).json({success:false,message:'User not found'});
         }   
+
+        const userData={
+            name:user.name,
+            email:user.email,
+            image:user.image,
+            phone:user.phone,
+            address:user.address,
+            gender:user.gender,
+            dob:user.dob,
+            joinedOn:user.createdAt
+        }
         res.status(200).json({
             success:true,
-            message:'User profile fetched successfully',user});
+            message:'User profile fetched successfully',user:userData});
     }
     catch(error){
         res.status(500).json({
@@ -237,20 +248,42 @@ const editProfile=async (req,res)=>{
         if(!validateUserEditData(req)){
             return res.status(400).json({success:false,message:'Invalid fields in request body'});
         }
-        const {phone,address,dob,gender}=req.body;
-        if(!phone || !address || !dob || !gender){
-            return res.status(400).json({success:false,message:'All fields are required'});
+        
+        if(req?.body?.phone!==undefined && !validator.isMobilePhone(req.body.phone.toString())){
+            return res.status(400).json({success:false,message:'Invalid phone number'});
         }
-        await User.findByIdAndUpdate(user._id,{phone,
-            address:address,
-            dob,
-            gender
-        },{runValidators:true});
+        if(req?.body.name!==undefined) user.name=req.body.name.toLowerCase().trim();
+        if(req?.body.phone!==undefined) user.phone=req.body.phone.trim();
+        if(req?.body.address!==undefined) user.address={
+            line1:req.body.address?.line1?.trim(),
+            line2:req.body.address?.line2?.trim(),
+            city:req.body.address?.city?.toLowerCase().trim(),
+            state:req.body.address?.state?.toLowerCase().trim(),
+            postalCode:req.body.address?.postalCode?.trim(),  
+            country:req.body.address?.country?.toLowerCase().trim()
 
-        await user.save();
+        };
+        if(req?.body.dob!==undefined) user.dob=req.body.dob;
+        if(req?.body.gender!==undefined) user.gender=req.body.gender;
+        const updatedUser=await user.save();    
+  
+
+        
+        const userData={
+            name:updatedUser.name,
+            email:updatedUser.email,
+            image:updatedUser.image,
+            phone:updatedUser.phone,
+            address:updatedUser.address,
+            gender:updatedUser.gender,
+            dob:updatedUser.dob,
+            joinedOn:updatedUser.createdAt
+        }
         res.status(200).json({
             success:true,
-            message:'User profile updated successfully'});
+            message:'User profile updated successfully',
+            user:userData
+        });
     }
     catch(error){       
         res.status(500).json({
@@ -273,6 +306,8 @@ const uploadProfilePicture=async (req,res)=>{
         if(!req.file){
             return res.status(400).json({success:false,message:'No file uploaded'});
         }
+
+
 
         if(user.image && user.image!=="https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM="){
             // delete the previous profile picture from cloudinary
@@ -304,6 +339,30 @@ const uploadProfilePicture=async (req,res)=>{
     }   
 }
 
+const removeProfilePicture=async (req,res)=>{
+    try{
+        const user=req.user;
+        if(user.image && user.image==="https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM="){
+            return res.status(400).json({success:false,message:'No profile picture to remove'});
+        }
+
+        // delete the profile picture from cloudinary
+        const publicId=getPublicIdFromUrl(user.image);
+        await cloudinary.uploader.destroy(publicId);
+        // update the user's image field to the default image
+        user.image="https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM=";
+        await user.save();
+        res.status(200).json({
+            success:true, 
+            message:'Profile picture removed successfully'
+        });
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:'Error removing profile picture',error:error.message}); 
+    }
+}
 
 // api to book appointment with doctor
 const bookAppointment=async (req,res)=>{
@@ -420,11 +479,30 @@ const checkSlotAvailability=async (req,res)=>{
 // api to get user appointments
 const getAppointments=async (req,res)=>{
     try{
+        const page=parseInt(req.query.page) || 1;
+        const limit=parseInt(req.query.limit) || 10;
+        const skip=(page-1)*limit;
+        const filter=req.query.isCompleted || "";
         const user=req.user;
-        const appointments=await Appointment.find({userId:user._id}).populate('docId').sort({date:-1});
+        const query={
+            userId:user._id,
+            cancelled:false
+        }
+
+        if(filter==="completed"){
+            query.isCompleted=true;
+        }
+        const appointments=await Appointment
+        .find(query)
+        .select("slotDate slotTime userData.name userData.image userData.address docData.name docData.specialization docData.degree docData.experience docData.gender amount payment isCompleted cancelled date")
+        .sort({date:-1})
+        .skip(skip)
+        .limit(limit);
         res.status(200).json({
             success:true,
-            appointments
+            appointments,
+            currentPage: page,
+            totalPages: Math.ceil(appointments.length / limit)
         });   
     }
     catch(error){
@@ -434,6 +512,7 @@ const getAppointments=async (req,res)=>{
         });
     }  
 } 
+
 
 
 // api to cancel appointment
@@ -503,4 +582,6 @@ const cancelAppointment=async (req,res)=>{
 
 
 
-module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl, googlelogin,isAuthenticated, LogoutUser, checkSlotAvailability};        
+
+
+module.exports = { registerUser, loginUser, getProfile, editProfile, uploadProfilePicture, bookAppointment, getAppointments, cancelAppointment ,getPublicIdFromUrl, googlelogin,isAuthenticated, LogoutUser, checkSlotAvailability, removeProfilePicture};        

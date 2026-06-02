@@ -12,7 +12,10 @@ const cors=require("cors")
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow requests from this origin
-  credentials: true // Allow cookies to be sent with requests
+  credentials: true, // Allow cookies to be sent with requests
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Explicitly allow PATCH
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
 app.use(express.json()); // req wali body ko json me convert krne ke liye
@@ -26,6 +29,20 @@ app.get('/', (req, res) => {
 
 
 
+app.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_UNEXPECTED_FILE") {
+            return res.status(400).json({
+                success: false,
+                message: "Please upload exactly one file"
+            });
+        }
+    }
+    res.status(400).json({
+        success: false,
+        message: err.message
+    });
+});
 
 
 connectDb().then(()=>{
