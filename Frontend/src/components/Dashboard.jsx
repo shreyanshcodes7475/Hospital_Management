@@ -39,22 +39,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Top Bar */}
-      <div className="bg-gray-800/50 backdrop-blur border-b border-teal-500/30 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Welcome, {user?.name || 'User'}</h2>
-            <p className="text-gray-400 text-sm capitalize">{userType} Dashboard</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="px-6 py-2 bg-red-500/20 border border-red-500/50 text-red-300 rounded-lg hover:bg-red-500/30 transition-all"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Tabs */}
@@ -106,7 +90,7 @@ export default function Dashboard() {
           <div className="space-y-8">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-gradient-to-br from-teal-900/50 to-cyan-900/50 border border-teal-500/30 rounded-xl p-6 hover:border-teal-400 transition-all">
+              <div className="bg-linear-to-br from-teal-900/50 to-cyan-900/50 border border-teal-500/30 rounded-xl p-6 hover:border-teal-400 transition-all">
                 <div className="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center text-2xl mb-4">
                   📅
                 </div>
@@ -114,7 +98,7 @@ export default function Dashboard() {
                 <p className="text-3xl font-bold">{upcomingAppointments.length}</p>
               </div>
 
-              <div className="bg-gradient-to-br from-cyan-900/50 to-teal-900/50 border border-cyan-500/30 rounded-xl p-6 hover:border-cyan-400 transition-all">
+              <div className="bg-linear-to-br from-cyan-900/50 to-teal-900/50 border border-cyan-500/30 rounded-xl p-6 hover:border-cyan-400 transition-all">
                 <div className="w-12 h-12 bg-cyan-600 rounded-lg flex items-center justify-center text-2xl mb-4">
                   📋
                 </div>
@@ -122,7 +106,7 @@ export default function Dashboard() {
                 <p className="text-3xl font-bold">{medicalRecords.length}</p>
               </div>
 
-              <div className="bg-gradient-to-br from-teal-900/50 to-cyan-900/50 border border-teal-500/30 rounded-xl p-6 hover:border-teal-400 transition-all">
+              <div className="bg-linear-to-br from-teal-900/50 to-cyan-900/50 border border-teal-500/30 rounded-xl p-6 hover:border-teal-400 transition-all">
                 <div className="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center text-2xl mb-4">
                   ✅
                 </div>
@@ -130,7 +114,7 @@ export default function Dashboard() {
                 <p className="text-3xl font-bold">8</p>
               </div>
 
-              <div className="bg-gradient-to-br from-cyan-900/50 to-teal-900/50 border border-cyan-500/30 rounded-xl p-6 hover:border-cyan-400 transition-all">
+              <div className="bg-linear-to-br from-cyan-900/50 to-teal-900/50 border border-cyan-500/30 rounded-xl p-6 hover:border-cyan-400 transition-all">
                 <div className="w-12 h-12 bg-cyan-600 rounded-lg flex items-center justify-center text-2xl mb-4">
                   ⏳
                 </div>
@@ -143,7 +127,7 @@ export default function Dashboard() {
             <div className="bg-gray-800/50 border border-teal-500/30 rounded-xl p-8">
               <h3 className="text-2xl font-bold mb-6">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button className="px-6 py-4 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all transform hover:scale-105">
+                <button className="px-6 py-4 bg-linear-to-r from-teal-500 to-cyan-600 text-white font-bold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all transform hover:scale-105">
                   Book Appointment
                 </button>
                 <button className="px-6 py-4 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-600 transition-all border border-gray-600">
@@ -223,7 +207,7 @@ export default function Dashboard() {
 
               <div className="space-y-6">
                 <div className="flex items-center gap-6 pb-6 border-b border-gray-700">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-4xl">
+                  <div className="w-20 h-20 rounded-full bg-linear-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-4xl">
                     👤
                   </div>
                   <div>
@@ -261,7 +245,7 @@ export default function Dashboard() {
                   ></textarea>
                 </div>
 
-                <button className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all">
+                <button className="px-6 py-3 bg-linear-to-r from-teal-500 to-cyan-600 text-white font-bold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all">
                   Save Changes
                 </button>
               </div>

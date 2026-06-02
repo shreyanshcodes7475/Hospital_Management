@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import LocationSelector from './LocationSelector'
 import BASE_URL from '../constants/BASE_URL'
 
-const TimeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00', '18:00']
+// Generate time slots from 9:00 AM to 5:00 PM in 30-minute intervals
+const generateTimeSlots = () => {
+  const slots = []
+  for (let hour = 9; hour <= 17; hour++) {
+    for (let minutes of [0, 30]) {
+      if (hour === 17 && minutes === 30) break // Stop after 5:00 PM
+      const time = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+      slots.push(time)
+    }
+  }
+  return slots
+}
+
+const TimeSlots = generateTimeSlots()
 
 export default function Doctors() {
   const location = useLocation()
@@ -12,11 +26,13 @@ export default function Doctors() {
     specialization: '',
     location: '',
   })
+  const [selectedLocation, setSelectedLocation] = useState('')
   const [expandedDoctorId, setExpandedDoctorId] = useState(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
   const [slotAvailability, setSlotAvailability] = useState({})
   const [checkingAvailability, setCheckingAvailability] = useState({})
+  const [isSearching, setIsSearching] = useState(false)
 
   useEffect(() => {
     // Get data from navigation state or sessionStorage
@@ -24,7 +40,9 @@ export default function Doctors() {
       // Handle both { doctors: [...] } and [...] formats
       const doctorsList = location.state.doctors.doctors || location.state.doctors
       setDoctors(Array.isArray(doctorsList) ? doctorsList : [])
-      setFilters(location.state.filters)
+      const newFilters = location.state.filters
+      setFilters(newFilters)
+      setSelectedLocation(newFilters?.location || '')
     } else {
       const storedResults = sessionStorage.getItem('doctorSearchResults')
       const storedFilters = sessionStorage.getItem('searchFilters')
@@ -34,12 +52,63 @@ export default function Doctors() {
         // Handle both { doctors: [...] } and [...] formats
         const doctorsList = parsed.doctors || parsed
         setDoctors(Array.isArray(doctorsList) ? doctorsList : [])
-        setFilters(JSON.parse(storedFilters))
+        const newFilters = JSON.parse(storedFilters)
+        setFilters(newFilters)
+        setSelectedLocation(newFilters?.location || '')
       } else {
         navigate('/')
       }
     }
   }, [location, navigate])
+
+  const handleLocationChange = async (newLocation) => {
+    setSelectedLocation(newLocation)
+    sessionStorage.setItem('userLocation', newLocation)
+    
+    // Refresh doctor search with new location
+    setIsSearching(true)
+    try {
+      const url = `${BASE_URL}/users/doctors?specialization=${encodeURIComponent(filters.specialization)}&location=${encodeURIComponent(newLocation)}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch doctors: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      // Update doctors and filters
+      const doctorsList = data.doctors || data
+      setDoctors(Array.isArray(doctorsList) ? doctorsList : [])
+      
+      const newFilters = {
+        ...filters,
+        location: newLocation,
+      }
+      setFilters(newFilters)
+      
+      // Store in sessionStorage
+      sessionStorage.setItem('doctorSearchResults', JSON.stringify(data))
+      sessionStorage.setItem('searchFilters', JSON.stringify(newFilters))
+      
+      // Clear previous selections
+      setSlotAvailability({})
+      setSelectedDate('')
+      setSelectedTime('')
+    } catch (error) {
+      console.error('Error fetching doctors:', error)
+      alert('Error fetching doctors. Please try again.')
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   const handleNewSearch = () => {
     sessionStorage.removeItem('doctorSearchResults')
@@ -78,9 +147,11 @@ export default function Doctors() {
       })
 
       const data = await response.json()
+      // Check if available is explicitly true (don't rely on success)
+      const isAvailable = data.available === true
       setSlotAvailability(prev => ({
         ...prev,
-        [key]: data.available || data.isAvailable || data.success,
+        [key]: isAvailable,
       }))
     } catch (error) {
       console.error('Error checking availability:', error)
@@ -95,15 +166,23 @@ export default function Doctors() {
 
   const handleTimeSelect = (doctor, date, time) => {
     setSelectedTime(time)
+    // Always check availability when a time is selected
     checkSlotAvailability(doctor, date, time)
   }
 
+  const [bookingInProgress, setBookingInProgress] = useState(false)
+
   const isSlotAvailable = (docId, date, time) => {
     const key = `${docId}-${date}-${time}`
-    return slotAvailability[key]
+    return slotAvailability[key] === true
   }
 
-  const handleBookAppointment = (doctor) => {
+  const isSlotChecking = (docId, date, time) => {
+    const key = `${docId}-${date}-${time}`
+    return checkingAvailability[key] === true
+  }
+
+  const handleBookAppointment = async (doctor) => {
     if (!selectedDate || !selectedTime) {
       alert('Please select date and time')
       return
@@ -115,16 +194,48 @@ export default function Doctors() {
       return
     }
 
-    sessionStorage.setItem('selectedDoctor', JSON.stringify(doctor))
-    sessionStorage.setItem('appointmentDetails', JSON.stringify({
-      doctorId: doctor._id,
-      date: selectedDate,
-      time: selectedTime,
-      docName: doctor.name,
-      specialization: doctor.specialization,
-      fees: doctor.fees,
-    }))
-    navigate('/book-appointment')
+    setBookingInProgress(true)
+    try {
+      const response = await fetch(`${BASE_URL}/users/book-appointment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          docId: doctor._id,
+          slotDate: selectedDate,
+          slotTime: selectedTime,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to book appointment')
+      }
+
+      // Success - show confirmation and navigate
+      alert('✓ Appointment booked successfully!')
+      
+      sessionStorage.setItem('selectedDoctor', JSON.stringify(doctor))
+      sessionStorage.setItem('appointmentDetails', JSON.stringify({
+        doctorId: doctor._id,
+        date: selectedDate,
+        time: selectedTime,
+        docName: doctor.name,
+        specialization: doctor.specialization,
+        fees: doctor.fees,
+      }))
+      
+      // Navigate to confirmation or dashboard
+      navigate('/dashboard')
+    } catch (error) {
+      console.error('Error booking appointment:', error)
+      alert(`Error: ${error.message}`)
+    } finally {
+      setBookingInProgress(false)
+    }
   }
 
   return (
@@ -148,7 +259,7 @@ export default function Doctors() {
           </div>
 
           {/* Active Filters */}
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mb-6">
             {filters.specialization && (
               <div className="inline-flex items-center gap-2 bg-teal-500/20 border border-teal-500/50 rounded-full px-4 py-2">
                 <span className="text-sm text-teal-300">Specialization:</span>
@@ -161,6 +272,26 @@ export default function Doctors() {
                 <span className="font-semibold">{filters.location}</span>
               </div>
             )}
+          </div>
+
+          {/* Location Selector */}
+          <div className="bg-gray-700/30 border border-teal-500/20 rounded-lg p-4 mb-6">
+            <label className="block text-sm font-semibold text-gray-300 mb-3">📍 Change Location</label>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1 max-w-xs">
+                <LocationSelector 
+                  onLocationSelect={handleLocationChange}
+                  currentLocation={selectedLocation}
+                  placeholder="Select a different location..."
+                />
+              </div>
+              {isSearching && (
+                <div className="flex items-center gap-2 text-teal-300">
+                  <div className="animate-spin">⟳</div>
+                  <span className="text-sm">Searching...</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -257,24 +388,31 @@ export default function Doctors() {
                           <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                             {TimeSlots.map((time) => {
                               const isAvailable = isSlotAvailable(doctor._id, selectedDate, time)
-                              const isChecking = checkingAvailability[`${doctor._id}-${selectedDate}-${time}`]
+                              const isChecking = isSlotChecking(doctor._id, selectedDate, time)
                               const isSelected = selectedTime === time
+                              const hasChecked = slotAvailability.hasOwnProperty(`${doctor._id}-${selectedDate}-${time}`)
 
                               return (
                                 <button
                                   key={time}
+                                  onMouseEnter={() => {
+                                    // Check availability on hover if not already checked
+                                    if (!hasChecked && !isChecking) {
+                                      checkSlotAvailability(doctor, selectedDate, time)
+                                    }
+                                  }}
                                   onClick={() => handleTimeSelect(doctor, selectedDate, time)}
-                                  disabled={isChecking}
+                                  disabled={isChecking || (hasChecked && !isAvailable)}
                                   className={`py-2 px-3 rounded-lg font-semibold text-sm transition-all ${
                                     isChecking
-                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                      : isAvailable === undefined
-                                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                      : isAvailable === false
+                                      ? 'bg-blue-600/50 text-blue-300 cursor-wait opacity-70 border border-blue-400/50'
+                                      : hasChecked && !isAvailable
                                       ? 'bg-red-600/30 text-red-300 cursor-not-allowed border border-red-500/30'
-                                      : isSelected
+                                      : isSelected && isAvailable
                                       ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white border-2 border-teal-300'
-                                      : 'bg-teal-600/30 text-teal-300 hover:bg-teal-600/50 border border-teal-500/50'
+                                      : isAvailable
+                                      ? 'bg-teal-600/30 text-teal-300 hover:bg-teal-600/50 border border-teal-500/50 cursor-pointer'
+                                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                   }`}
                                 >
                                   {isChecking ? (
@@ -292,13 +430,15 @@ export default function Doctors() {
                       {/* Availability Status */}
                       {selectedDate && selectedTime && (
                         <div className={`p-3 rounded-lg text-sm font-semibold text-center ${
-                          slotAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                          isSlotChecking(doctor._id, selectedDate, selectedTime)
+                            ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                            : isSlotAvailable(doctor._id, selectedDate, selectedTime)
                             ? 'bg-green-600/20 text-green-300 border border-green-500/30'
                             : 'bg-red-600/20 text-red-300 border border-red-500/30'
                         }`}>
-                          {checkingAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                          {isSlotChecking(doctor._id, selectedDate, selectedTime)
                             ? '⟳ Checking availability...'
-                            : slotAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                            : isSlotAvailable(doctor._id, selectedDate, selectedTime)
                             ? '✓ Slot Available'
                             : '✗ Slot Not Available'}
                         </div>
@@ -310,20 +450,31 @@ export default function Doctors() {
                         disabled={
                           !selectedDate ||
                           !selectedTime ||
-                          !slotAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                          isSlotChecking(doctor._id, selectedDate, selectedTime) ||
+                          !isSlotAvailable(doctor._id, selectedDate, selectedTime) ||
+                          bookingInProgress
                         }
                         className={`w-full px-4 py-3 font-bold rounded-lg transition-all transform ${
                           selectedDate &&
                           selectedTime &&
-                          slotAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                          !isSlotChecking(doctor._id, selectedDate, selectedTime) &&
+                          isSlotAvailable(doctor._id, selectedDate, selectedTime) &&
+                          !bookingInProgress
                             ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white hover:from-teal-600 hover:to-cyan-700 hover:scale-105 shadow-lg'
                             : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                         }`}
                       >
-                        {selectedDate && selectedTime && slotAvailability[`${doctor._id}-${selectedDate}-${selectedTime}`]
+                        {bookingInProgress ? (
+                          <>
+                            <span className="inline-block animate-spin mr-2">⟳</span>
+                            Booking...
+                          </>
+                        ) : isSlotChecking(doctor._id, selectedDate, selectedTime)
+                          ? '⟳ Checking Availability...'
+                          : selectedDate && selectedTime && isSlotAvailable(doctor._id, selectedDate, selectedTime)
                           ? 'Book Appointment'
-                          : selectedDate && selectedTime
-                          ? 'Checking...'
+                          : selectedDate && selectedTime && !isSlotAvailable(doctor._id, selectedDate, selectedTime)
+                          ? '✗ Slot Not Available'
                           : 'Select Date & Time'}
                       </button>
                     </div>

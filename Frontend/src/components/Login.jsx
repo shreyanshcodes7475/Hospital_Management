@@ -48,7 +48,7 @@ export default function Login() {
         return
       }
       
-      login(data.user, userType)
+      login(data.user, userType, data.token || data.authToken)
       navigate('/home')
     } catch (err) {
       console.error('Google login error:', err)
@@ -82,7 +82,7 @@ export default function Login() {
         return
       }
 
-      login(data.user, userType)
+      login(data.user, userType, data.token || data.authToken)
       navigate('/home')
     } catch (err) {
       setError('Login failed. Please try again.')
