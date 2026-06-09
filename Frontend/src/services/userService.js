@@ -48,4 +48,15 @@ export const userService = {
       body: formData,
     });
   },
+
+  // Remove profile picture
+  removeProfilePicture: async (token) => {
+    return fetch(`${BASE_URL}/users/remove-profile-picture`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };

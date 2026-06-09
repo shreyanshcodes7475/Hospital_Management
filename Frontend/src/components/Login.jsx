@@ -48,8 +48,8 @@ export default function Login() {
         return
       }
       
-      login(data.user, userType, data.token || data.authToken)
-      navigate('/home')
+      login(data.user, 'patient', data.token || data.authToken)
+      navigate('/dashboard')
     } catch (err) {
       console.error('Google login error:', err)
       setError('Google login failed. Please try again.')
@@ -67,11 +67,12 @@ export default function Login() {
 
     setLoading(true)
     try {
-        const response = await fetch(`${BASE_URL}/users/login`, {
+      const endpoint = userType === 'doctor' ? '/doctors/login' : '/users/login'
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, userType }),
+        body: JSON.stringify(formData),
       })
 
       const data = await response.json()
@@ -82,8 +83,10 @@ export default function Login() {
         return
       }
 
-      login(data.user, userType, data.token || data.authToken)
-      navigate('/home')
+      // API may return `doctor` or `user`; prefer whichever exists
+      login(data.doctor || data.user, userType, data.token || data.authToken)
+      const redirectPath = userType === 'doctor' ? '/doctor-dashboard' : '/dashboard'
+      navigate(redirectPath)
     } catch (err) {
       setError('Login failed. Please try again.')
       setLoading(false)

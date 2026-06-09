@@ -3,45 +3,60 @@ import { createContext, useState, useContext, useEffect } from 'react';
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [userType, setUserType] = useState(null);
-  const [token, setToken] = useState(null);
-
-  // Initialize from localStorage on mount
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     try {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      const storedUserType = localStorage.getItem('userType');
-
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-        setUserType(storedUserType);
-      }
-    } catch (error) {
-      console.error('Error parsing stored user data:', error);
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      localStorage.removeItem('userType');
+      const storedUser = localStorage.getItem('user')
+      return storedUser ? JSON.parse(storedUser) : null
+    } catch (err) {
+      console.error('Error parsing stored user:', err)
+      localStorage.removeItem('user')
+      return null
     }
-  }, []);
+  })
+
+  const [userType, setUserType] = useState(() => {
+    try {
+      return localStorage.getItem('userType') || null
+    } catch (err) {
+      localStorage.removeItem('userType')
+      return null
+    }
+  })
+
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem('token') || null
+    } catch (err) {
+      localStorage.removeItem('token')
+      return null
+    }
+  })
 
   const login = (userData, userTypeValue, authToken = null) => {
-    setUser(userData);
-    setUserType(userTypeValue);
+    setUser(userData)
+    setUserType(userTypeValue)
     
     // Store in localStorage
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('userType', userTypeValue);
+    localStorage.setItem('user', JSON.stringify(userData))
+    localStorage.setItem('userType', userTypeValue || 'patient')
     
     if (authToken) {
-      setToken(authToken);
-      localStorage.setItem('token', authToken);
+      setToken(authToken)
+      localStorage.setItem('token', authToken)
     }
-  };
+  }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Call logout API
+      await fetch('http://localhost:3000/api/users/logout', {
+        method: 'GET',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout API error:', error);
+    }
+    
     setUser(null);
     setUserType(null);
     setToken(null);

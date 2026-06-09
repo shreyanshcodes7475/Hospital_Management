@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import BASE_URL from '../constants/BASE_URL'
 import { userService } from '../services/userService'
+import ProfilePhotoModal from './ProfilePhotoModal'
 
 export default function UserProfile() {
   const { user, setUser } = useAuth()
@@ -10,8 +11,7 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
-  const fileInputRef = useRef(null)
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [profileData, setProfileData] = useState({
     name: '',
     phone: '',
@@ -153,26 +153,17 @@ export default function UserProfile() {
     // Validate file is an image
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload only image files (JPG, PNG, GIF, etc.)')
-      setSelectedFile(null)
       return
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File size must be less than 5MB')
-      setSelectedFile(null)
       return
     }
-
-    setSelectedFile(file)
   }
 
-  const handleUploadPicture = async () => {
-    if (!selectedFile) {
-      toast.error('Please select an image first')
-      return
-    }
-
+  const handleUploadProfilePicture = async (file) => {
     try {
       setUploading(true)
       const token = localStorage.getItem('token')
@@ -182,7 +173,7 @@ export default function UserProfile() {
         return
       }
 
-      const response = await userService.uploadProfilePicture(token, selectedFile)
+      const response = await userService.uploadProfilePicture(token, file)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -198,13 +189,7 @@ export default function UserProfile() {
           iamge: data.imageUrl || data.user?.iamge,
         }
         setUser(updatedUser)
-        setSelectedFile(null)
-        
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
-        }
-        
+        setShowPhotoModal(false)
         toast.success('Profile picture updated successfully!')
       } else {
         toast.error(data.message || 'Failed to upload profile picture')
@@ -217,8 +202,44 @@ export default function UserProfile() {
     }
   }
 
-  const handleProfilePhotoClick = () => {
-    fileInputRef.current?.click()
+  const handleRemoveProfilePicture = async () => {
+    try {
+      setUploading(true)
+      const token = localStorage.getItem('token')
+      
+      if (!token) {
+        toast.error('Authentication required')
+        return
+      }
+
+      const response = await userService.removeProfilePicture(token)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update user profile
+        const updatedUser = {
+          ...user,
+          image: null,
+          iamge: null,
+        }
+        setUser(updatedUser)
+        setShowPhotoModal(false)
+        toast.success('Profile picture removed successfully!')
+      } else {
+        toast.error(data.message || 'Failed to remove profile picture')
+      }
+    } catch (error) {
+      console.error('Error removing profile picture:', error)
+      toast.error('Error: ' + (error.message || 'Failed to remove profile picture'))
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (loading && !user) {
@@ -250,7 +271,7 @@ export default function UserProfile() {
           <div className="flex items-center gap-6">
             {/* Clickable Profile Photo */}
             <div 
-              onClick={handleProfilePhotoClick}
+              onClick={() => setShowPhotoModal(true)}
               className="relative w-24 h-24 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-5xl border-2 border-teal-400 shadow-lg cursor-pointer hover:opacity-80 hover:border-cyan-300 transition-all group"
             >
               {user?.iamge || user?.image ? (
@@ -269,51 +290,12 @@ export default function UserProfile() {
               </div>
             </div>
 
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
             <div>
               <h2 className="text-3xl font-bold text-white">{profileData.name}</h2>
               <p className="text-teal-400 text-lg">Patient</p>
               <p className="text-gray-400 text-sm mt-1">
                 Joined {user?.joinedOn ? new Date(user.joinedOn).toLocaleDateString() : 'Recently'}
               </p>
-
-              {/* Upload status */}
-              {selectedFile && (
-                <div className="mt-3 bg-cyan-900/30 border border-cyan-500/50 rounded px-3 py-2">
-                  <p className="text-xs text-cyan-300">
-                    📁 {selectedFile.name}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={handleUploadPicture}
-                      disabled={uploading}
-                      className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded transition"
-                    >
-                      {uploading ? '⏳ Uploading...' : '✅ Upload'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedFile(null)
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = ''
-                        }
-                      }}
-                      disabled={uploading}
-                      className="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded transition"
-                    >
-                      ❌ Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           {!isEditing && (
@@ -565,7 +547,20 @@ export default function UserProfile() {
               </button>
             </div>
           </form>
-        </div>}
-    </div>
+        </div>
+      )}
+
+    {/* Profile Photo Modal */}
+    {showPhotoModal && (
+      <ProfilePhotoModal
+        currentImage={user?.iamge || user?.image}
+        userName={user?.name || 'User'}
+        uploading={uploading}
+        onUpload={handleUploadProfilePicture}
+        onRemove={handleRemoveProfilePicture}
+        onClose={() => setShowPhotoModal(false)}
+      />
+    )}
+  </div>
   )
 }

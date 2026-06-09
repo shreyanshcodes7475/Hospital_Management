@@ -11,12 +11,20 @@ import Doctors from './components/Doctors'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Dashboard from './components/Dashboard'
 import UserDashboard from './components/UserDashboard'
+import DoctorLogin from './components/DoctorLogin'
+import DoctorHome from './components/DoctorHome'
+import DoctorDashboard from './components/DoctorDashboard'
 import BASE_URL from './constants/BASE_URL'
 
 function AppContent() {
-  const { setUser } = useAuth()
+  const { setUser, user, userType } = useAuth()
 
   useEffect(() => {
+    // If user is already in state (from localStorage), don't fetch again
+    if (user) {
+      return
+    }
+
     const checkAuth = async () => {
       try {
         const response = await fetch(`${BASE_URL}/users/auth`, {
@@ -26,12 +34,9 @@ function AppContent() {
         const data = await response.json()
         if (data.authenticated) {
           setUser(data.user)
-        } else {
-          setUser(null)
         }
       } catch (err) {
         console.log('Auth check error:', err)
-        setUser(null)
       }
     }
     checkAuth()
@@ -48,6 +53,9 @@ function AppContent() {
         <Route path='/doctors' element={<Doctors />} />
         <Route path='/dashboard' element={<UserDashboard />} />
         <Route path='/admin-dashboard/*' element={<Dashboard />} />
+        <Route path='/doctor-login' element={<DoctorLogin />} />
+        <Route path='/doctor-home' element={<DoctorHome />} />
+        <Route path='/doctor-dashboard' element={<DoctorDashboard />} />
       </Routes>
       <ToastContainer
         position="top-right"
