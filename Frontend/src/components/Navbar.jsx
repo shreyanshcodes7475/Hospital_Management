@@ -96,7 +96,10 @@ export default function Navbar() {
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {user || userType ? (
-              <div className="flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-full">
+              <button
+                onClick={handleDashboard}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-colors cursor-pointer"
+              >
                 <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-400 rounded-full flex items-center justify-center">
                   <span className="text-xs font-bold text-gray-900">
                     {(user?.name || userType || 'User').charAt(0).toUpperCase()}
@@ -105,7 +108,7 @@ export default function Navbar() {
                 <span className="text-white font-medium text-sm">
                   {user?.name || userType || 'User'}
                 </span>
-              </div>
+              </button>
             ) : (
               <Link
                 to="/login"

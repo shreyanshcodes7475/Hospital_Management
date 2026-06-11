@@ -11,7 +11,6 @@ export default function DoctorDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('appointments')
   const [appointments, setAppointments] = useState([])
-  const [patients, setPatients] = useState([])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authChecked, setAuthChecked] = useState(false)
@@ -21,6 +20,11 @@ export default function DoctorDashboard() {
   const [uploading, setUploading] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const itemsPerPage = 10
+
+  // Appointment filters
+  const [filterIsCompleted, setFilterIsCompleted] = useState('not-completed')
+  const [filterCancelled, setFilterCancelled] = useState('not-cancelled')
+  const [filterPhoneNumber, setFilterPhoneNumber] = useState('')
 
   useEffect(() => {
     // Give localStorage a moment to restore auth state
@@ -49,14 +53,19 @@ export default function DoctorDashboard() {
     }
   }, [authChecked, activeTab])
 
+  // Apply filters whenever they change
+  useEffect(() => {
+    if (activeTab === 'appointments' && authChecked) {
+      fetchAppointments(1)
+    }
+  }, [filterIsCompleted, filterCancelled, filterPhoneNumber])
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
 
       if (activeTab === 'appointments') {
-        await fetchAppointments()
-      } else if (activeTab === 'patients') {
-        await fetchPatients()
+        await fetchAppointments(1)
       } else if (activeTab === 'profile') {
         await fetchProfile()
       }
@@ -65,9 +74,17 @@ export default function DoctorDashboard() {
     }
   }
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = async (page = 1) => {
     try {
-      const response = await fetch(`${BASE_URL}/doctors/appointments`, {
+      const params = new URLSearchParams({
+        page,
+        limit: itemsPerPage,
+        isCompleted: filterIsCompleted === 'completed',
+        cancelled: filterCancelled === 'cancelled',
+        ...(filterPhoneNumber && { phoneNumber: filterPhoneNumber })
+      })
+
+      const response = await fetch(`${BASE_URL}/doctors/appointments?${params}`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -76,28 +93,11 @@ export default function DoctorDashboard() {
       if (response.ok) {
         const data = await response.json()
         setAppointments(data.appointments || [])
+        setCurrentPage(page)
       }
     } catch (error) {
       console.error('Error fetching appointments:', error)
       toast.error('Failed to load appointments')
-    }
-  }
-
-  const fetchPatients = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}/doctors/patients`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setPatients(data.patients || [])
-      }
-    } catch (error) {
-      console.error('Error fetching patients:', error)
-      toast.error('Failed to load patients')
     }
   }
 
@@ -146,6 +146,48 @@ export default function DoctorDashboard() {
     } catch (error) {
       console.error('Error updating appointment:', error)
       toast.error('Failed to update appointment')
+    }
+  }
+
+  const handleCompleteAppointment = async (appointmentId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/doctors/appointments/${appointmentId}/complete`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (response.ok) {
+        toast.success('Appointment marked as completed')
+        fetchAppointments()
+      } else {
+        const data = await response.json()
+        toast.error(data.message || 'Failed to complete appointment')
+      }
+    } catch (error) {
+      console.error('Error completing appointment:', error)
+      toast.error('Failed to complete appointment')
+    }
+  }
+
+  const handleCancelAppointment = async (appointmentId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/doctors/appointments/${appointmentId}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (response.ok) {
+        toast.success('Appointment cancelled successfully')
+        fetchAppointments()
+      } else {
+        const data = await response.json()
+        toast.error(data.message || 'Failed to cancel appointment')
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error)
+      toast.error('Failed to cancel appointment')
     }
   }
 
@@ -277,13 +319,13 @@ export default function DoctorDashboard() {
         <div className="w-64 bg-gray-800 border-r border-teal-500/30 min-h-screen p-6">
           <div className="mb-8">
             <h2 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-              MedHub
+              DocLink
             </h2>
             <p className="text-gray-400 text-sm">Doctor Portal</p>
           </div>
 
           <div className="space-y-4 mb-8">
-            {['appointments', 'patients', 'profile'].map((tab) => (
+            {['appointments', 'profile'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -297,7 +339,6 @@ export default function DoctorDashboard() {
                 }`}
               >
                 {tab === 'appointments' && '📅 '}
-                {tab === 'patients' && '👥 '}
                 {tab === 'profile' && '👤 '}
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -320,7 +361,6 @@ export default function DoctorDashboard() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">
               {activeTab === 'appointments' && 'Appointments'}
-              {activeTab === 'patients' && 'My Patients'}
               {activeTab === 'profile' && 'Profile Settings'}
             </h1>
             <p className="text-gray-400">Welcome back, {user?.name || 'Doctor'}</p>
@@ -329,6 +369,56 @@ export default function DoctorDashboard() {
           {/* Appointments Tab */}
           {activeTab === 'appointments' && (
             <div>
+              {/* Filters */}
+              <div className="mb-6 bg-gray-800/50 backdrop-blur border border-teal-500/30 rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4 text-teal-300">Filters</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Status Filters */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Completion Status</label>
+                    <select
+                      value={filterIsCompleted}
+                      onChange={(e) => {
+                        setFilterIsCompleted(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 border border-teal-500/30 rounded-lg text-white focus:outline-none focus:border-teal-400"
+                    >
+                      <option value="completed">Completed</option>
+                      <option value="not-completed">Not Completed</option>
+                    </select>
+                  </div>
+
+                  {/* Cancelled Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Cancelled Status</label>
+                    <select
+                      value={filterCancelled}
+                      onChange={(e) => {
+                        setFilterCancelled(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 border border-teal-500/30 rounded-lg text-white focus:outline-none focus:border-teal-400"
+                    >
+                      <option value="cancelled">Cancelled</option>
+                      <option value="not-cancelled">Not Cancelled</option>
+                    </select>
+                  </div>
+
+                  {/* Phone Number Search */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Search by Phone</label>
+                    <input
+                      type="text"
+                      placeholder="Enter patient phone number"
+                      value={filterPhoneNumber}
+                      onChange={(e) => setFilterPhoneNumber(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-700 border border-teal-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-teal-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {loading ? (
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
@@ -341,175 +431,141 @@ export default function DoctorDashboard() {
               ) : appointments.length === 0 ? (
                 <div className="bg-gray-800/50 backdrop-blur border border-teal-500/30 rounded-xl p-12 text-center">
                   <div className="text-4xl mb-4">📭</div>
-                  <h3 className="text-xl font-semibold mb-2">No Appointments</h3>
-                  <p className="text-gray-400">You don't have any appointments scheduled yet.</p>
+                  <h3 className="text-xl font-semibold mb-2">No Appointments Found</h3>
+                  <p className="text-gray-400">No appointments match your filters.</p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-4">
-                    {getPaginatedData(appointments).map((appointment) => (
+                    {appointments.map((appointment) => (
                       <div
                         key={appointment._id}
                         className="bg-gray-800/50 backdrop-blur border border-teal-500/30 rounded-xl p-6 hover:border-teal-400/50 transition"
                       >
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold text-teal-300">
-                              {appointment.patientName || 'Patient'}
-                            </h3>
-                            <p className="text-gray-400 text-sm">
-                              {new Date(appointment.appointmentDate).toLocaleDateString()} at{' '}
-                              {appointment.appointmentTime}
-                            </p>
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
+                          {/* Patient Info */}
+                          <div className="flex items-start gap-4 mb-4 md:mb-0 flex-1">
+                            <img
+                              src={appointment.userData?.image || 'https://media.istockphoto.com/id/1478688327/vector/user-symbol-account-symbol-vector.jpg?s=612x612&w=0&k=20&c=N1Wxw0XjkUoXT9_Vaxa4SNIj1IvdJ2L2GQfEVVMTaFM='}
+                              alt="Patient"
+                              className="w-16 h-16 rounded-full border-2 border-teal-500/30 object-cover"
+                            />
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-teal-300 mb-1">
+                                {appointment.userData?.name || 'Patient'}
+                              </h3>
+                              <p className="text-gray-400 text-sm mb-1">
+                                📧 {appointment.userData?.email || 'N/A'}
+                              </p>
+                              <p className="text-gray-400 text-sm mb-1">
+                                📱 {appointment.userData?.phone || 'N/A'}
+                              </p>
+                              <p className="text-gray-400 text-sm mb-1">
+                                📍 {appointment.userData?.address?.line1 || 'N/A'}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                💰 ₹{appointment.amount || 'N/A'}
+                              </p>
+                            </div>
                           </div>
-                          <span
-                            className={`px-4 py-2 rounded-full text-sm font-medium ${
-                              appointment.status === 'completed'
-                                ? 'bg-green-500/20 text-green-300'
-                                : appointment.status === 'cancelled'
-                                ? 'bg-red-500/20 text-red-300'
-                                : 'bg-blue-500/20 text-blue-300'
-                            }`}
-                          >
-                            {appointment.status}
-                          </span>
+
+                          {/* Status Badge */}
+                          <div className="text-right">
+                            <span
+                              className={`inline-block px-4 py-2 rounded-full text-sm font-bold mb-2 ${
+                                appointment.isCompleted
+                                  ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                                  : appointment.cancelled
+                                  ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}
+                            >
+                              {appointment.isCompleted ? '✓ Completed' : appointment.cancelled ? '✕ Cancelled' : '⏳ Pending'}
+                            </span>
+                          </div>
                         </div>
 
-                        <p className="text-gray-300 mb-4">{appointment.reason || 'General checkup'}</p>
+                        {/* Appointment Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                          <div>
+                            <p className="text-gray-400 text-xs uppercase tracking-wider">Date</p>
+                            <p className="text-white font-semibold">
+                              {new Date(appointment.slotDate).toLocaleDateString('en-IN', {
+                                weekday: 'short',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 text-xs uppercase tracking-wider">Time</p>
+                            <p className="text-white font-semibold">{appointment.slotTime}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 text-xs uppercase tracking-wider">Status</p>
+                            <p className="text-white font-semibold">
+                              {appointment.payment ? '💳 Paid' : '⏳ Pending'}
+                            </p>
+                          </div>
+                        </div>
 
-                        {appointment.status === 'scheduled' && (
-                          <div className="flex gap-3">
+                        {/* Action Buttons */}
+                        {!appointment.isCompleted && !appointment.cancelled && (
+                          <div className="flex flex-col sm:flex-row gap-3">
                             <button
-                              onClick={() =>
-                                handleUpdateAppointmentStatus(appointment._id, 'completed')
-                              }
-                              className="flex-1 px-4 py-2 bg-green-500/20 border border-green-500/50 text-green-300 rounded-lg hover:bg-green-500/30 transition"
+                              onClick={() => handleCompleteAppointment(appointment._id)}
+                              className="flex-1 px-4 py-3 bg-green-500/20 border border-green-500/50 text-green-300 rounded-lg hover:bg-green-500/30 transition font-medium flex items-center justify-center gap-2"
                             >
-                              Complete
+                              <span>✓</span> Mark as Completed
                             </button>
                             <button
-                              onClick={() =>
-                                handleUpdateAppointmentStatus(appointment._id, 'cancelled')
-                              }
-                              className="flex-1 px-4 py-2 bg-red-500/20 border border-red-500/50 text-red-300 rounded-lg hover:bg-red-500/30 transition"
+                              onClick={() => handleCancelAppointment(appointment._id)}
+                              className="flex-1 px-4 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-lg hover:bg-red-500/30 transition font-medium flex items-center justify-center gap-2"
                             >
-                              Cancel
+                              <span>✕</span> Cancel Appointment
                             </button>
+                          </div>
+                        )}
+
+                        {appointment.isCompleted && (
+                          <div className="px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-300 text-sm text-center font-medium">
+                            ✓ This appointment has been completed
+                          </div>
+                        )}
+
+                        {appointment.cancelled && (
+                          <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300 text-sm text-center font-medium">
+                            ✕ This appointment has been cancelled
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
 
-                  {getTotalPages(appointments) > 1 && (
-                    <div className="mt-6 flex justify-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-gray-800 border border-teal-500/30 rounded-lg disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <div className="flex items-center gap-2">
-                        {Array.from({ length: getTotalPages(appointments) }, (_, i) => i + 1).map(
-                          (page) => (
-                            <button
-                              key={page}
-                              onClick={() => setCurrentPage(page)}
-                              className={`px-3 py-2 rounded-lg ${
-                                currentPage === page
-                                  ? 'bg-teal-500/50 border border-teal-500'
-                                  : 'bg-gray-800 border border-teal-500/30'
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          )
-                        )}
-                      </div>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.min(getTotalPages(appointments), currentPage + 1))
+                  {/* Pagination */}
+                  <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <button
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          fetchAppointments(currentPage - 1)
                         }
-                        disabled={currentPage === getTotalPages(appointments)}
-                        className="px-4 py-2 bg-gray-800 border border-teal-500/30 rounded-lg disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Patients Tab */}
-          {activeTab === 'patients' && (
-            <div>
-              {loading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-gray-800/50 rounded-lg p-6 animate-pulse">
-                      <div className="h-4 bg-gray-700 rounded w-1/2 mb-2"></div>
-                      <div className="h-4 bg-gray-700 rounded w-1/3"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : patients.length === 0 ? (
-                <div className="bg-gray-800/50 backdrop-blur border border-teal-500/30 rounded-xl p-12 text-center">
-                  <div className="text-4xl mb-4">👥</div>
-                  <h3 className="text-xl font-semibold mb-2">No Patients</h3>
-                  <p className="text-gray-400">You haven't seen any patients yet.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-teal-500/30">
-                          <th className="text-left px-4 py-3 text-teal-300">Name</th>
-                          <th className="text-left px-4 py-3 text-teal-300">Email</th>
-                          <th className="text-left px-4 py-3 text-teal-300">Phone</th>
-                          <th className="text-left px-4 py-3 text-teal-300">Last Visit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getPaginatedData(patients).map((patient) => (
-                          <tr key={patient._id} className="border-b border-gray-700 hover:bg-gray-800/50">
-                            <td className="px-4 py-3 text-white">{patient.name || 'N/A'}</td>
-                            <td className="px-4 py-3 text-gray-300">{patient.email || 'N/A'}</td>
-                            <td className="px-4 py-3 text-gray-300">{patient.phone || 'N/A'}</td>
-                            <td className="px-4 py-3 text-gray-400">
-                              {patient.lastVisit
-                                ? new Date(patient.lastVisit).toLocaleDateString()
-                                : 'N/A'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                      }}
+                      disabled={currentPage === 1}
+                      className="px-6 py-2 bg-gray-800 border border-teal-500/30 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-teal-400 transition"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-gray-400">
+                      Page <span className="text-teal-300 font-semibold">{currentPage}</span>
+                    </span>
+                    <button
+                      onClick={() => fetchAppointments(currentPage + 1)}
+                      className="px-6 py-2 bg-gray-800 border border-teal-500/30 rounded-lg hover:border-teal-400 transition"
+                    >
+                      Next →
+                    </button>
                   </div>
-
-                  {getTotalPages(patients) > 1 && (
-                    <div className="mt-6 flex justify-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-gray-800 border border-teal-500/30 rounded-lg disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.min(getTotalPages(patients), currentPage + 1))
-                        }
-                        disabled={currentPage === getTotalPages(patients)}
-                        className="px-4 py-2 bg-gray-800 border border-teal-500/30 rounded-lg disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
             </div>
