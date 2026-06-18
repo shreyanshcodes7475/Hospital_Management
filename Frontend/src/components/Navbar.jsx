@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
@@ -12,6 +13,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     await logout()
     navigate('/')
+    toast.success('Logged out successfully')
     setIsMenuOpen(false)
     setIsProfileDropdownOpen(false)
   }

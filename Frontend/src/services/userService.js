@@ -59,4 +59,18 @@ export const userService = {
       },
     });
   },
+
+  // Cancel appointment
+  cancelAppointment: async (token, appointmentId) => {
+    return fetch(`${BASE_URL}/users/cancel-appointment`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        appointmentId: appointmentId,
+      }),
+    });
+  },
 };

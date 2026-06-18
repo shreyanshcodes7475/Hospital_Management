@@ -48,8 +48,9 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      // Call logout API
-      await fetch('http://localhost:3000/api/users/logout', {
+      // Call logout API based on user type
+      const endpoint = userType === 'doctor' ? '/doctors/logout' : '/users/logout';
+      await fetch(`http://localhost:3000/api${endpoint}`, {
         method: 'GET',
         credentials: 'include'
       });

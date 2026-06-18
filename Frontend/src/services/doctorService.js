@@ -21,8 +21,9 @@ export const doctorAuthService = {
 
   logout: async () => {
     return fetch(`${Base_url}/doctors/logout`, {
-      method: 'POST',
+      method: 'GET',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
     })
   },
 }

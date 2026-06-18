@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { toast } from 'react-toastify'
 import LocationSelector from './LocationSelector'
 import BASE_URL from '../constants/BASE_URL'
 
@@ -50,7 +51,7 @@ export default function Home() {
     }
 
     if (!selectedLocation.trim()) {
-      alert('Please select a location first')
+      toast.error('Please select a location first')
       return
     }
 
@@ -88,7 +89,7 @@ export default function Home() {
       
     } catch (error) {
       console.error('Error fetching doctors:', error)
-      alert('Error fetching doctors. Please try again.')
+      toast.error('Error fetching doctors. Please try again.')
     } finally {
       setLoading(false)
     }

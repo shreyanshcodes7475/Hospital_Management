@@ -9,7 +9,7 @@ import ProfilePhotoModal from './ProfilePhotoModal'
 export default function DoctorDashboard() {
   const { user, userType, logout, setUser } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('appointments')
+  const [activeTab, setActiveTab] = useState('profile')
   const [appointments, setAppointments] = useState([])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -19,6 +19,7 @@ export default function DoctorDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
   const [uploading, setUploading] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [changingAvailability, setChangingAvailability] = useState(false)
   const itemsPerPage = 10
 
   // Appointment filters
@@ -76,13 +77,21 @@ export default function DoctorDashboard() {
 
   const fetchAppointments = async (page = 1) => {
     try {
-      const params = new URLSearchParams({
-        page,
-        limit: itemsPerPage,
-        isCompleted: filterIsCompleted === 'completed',
-        cancelled: filterCancelled === 'cancelled',
-        ...(filterPhoneNumber && { phoneNumber: filterPhoneNumber })
-      })
+      const params = new URLSearchParams()
+      params.append('page', page)
+      params.append('limit', itemsPerPage)
+      params.append('completed', filterIsCompleted === 'completed' ? 'true' : 'false')
+      
+      // For cancelled filter, send explicit parameter
+      if (filterCancelled === 'cancelled') {
+        params.append('cancelled', 'true')
+      } else if (filterCancelled === 'not-cancelled') {
+        params.append('cancelled', 'false')
+      }
+      
+      if (filterPhoneNumber) {
+        params.append('phone', filterPhoneNumber)
+      }
 
       const response = await fetch(`${BASE_URL}/doctors/appointments?${params}`, {
         method: 'GET',
@@ -214,8 +223,34 @@ export default function DoctorDashboard() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleChangeAvailability = async () => {
+    try {
+      setChangingAvailability(true)
+      const response = await fetch(`${BASE_URL}/doctors/change-availability`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Availability updated to ${data.available ? 'Available' : 'Not Available'}`)
+        // Refetch profile to get updated availability
+        await fetchProfile()
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.message || 'Failed to change availability')
+      }
+    } catch (error) {
+      console.error('Error changing availability:', error)
+      toast.error('Failed to change availability')
+    } finally {
+      setChangingAvailability(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await logout()
     navigate('/')
     toast.success('Logged out successfully')
   }
@@ -608,7 +643,20 @@ export default function DoctorDashboard() {
                           </div>
 
                           <div>
-                            <h2 className="text-3xl font-bold text-white mb-2">{profile?.name || 'N/A'}</h2>
+                            <div className="flex items-center gap-3 mb-2">
+                              <h2 className="text-3xl font-bold text-white">{profile?.name || 'N/A'}</h2>
+                              <button
+                                onClick={handleChangeAvailability}
+                                disabled={changingAvailability}
+                                className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                                  profile?.available
+                                    ? 'bg-green-500/20 border border-green-500/50 text-green-300 hover:bg-green-500/30'
+                                    : 'bg-red-500/20 border border-red-500/50 text-red-300 hover:bg-red-500/30'
+                                } ${changingAvailability ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {changingAvailability ? '⏳ Updating...' : profile?.available ? '🟢 Available' : '🔴 Not Available'}
+                              </button>
+                            </div>
                             <p className="text-teal-400 text-lg font-medium">{profile?.specialization || 'Medical Professional'}</p>
                             <p className="text-gray-400 text-sm mt-2">Experience: {profile?.experience || 0} years</p>
                           </div>

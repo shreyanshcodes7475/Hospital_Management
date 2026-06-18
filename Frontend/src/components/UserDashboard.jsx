@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import ProfileEditModal from './ProfileEditModal';
@@ -9,17 +9,23 @@ import { userService } from '../services/userService';
 
 export default function UserDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, token, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'profile');
+  const [cancellingId, setCancellingId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [editData, setEditData] = useState({});
   const fileInputRef = useRef(null);
+  const [filterIsCompleted, setFilterIsCompleted] = useState('not-completed');
+  const [filterCancelled, setFilterCancelled] = useState('not-cancelled');
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     fetchProfile();
@@ -183,11 +189,23 @@ export default function UserDashboard() {
     if (activeTab === 'appointments') {
       fetchAppointments();
     }
-  }, [activeTab, currentPage]);
+  }, [activeTab, currentPage, filterIsCompleted, filterCancelled]);
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = async (page = 1) => {
     try {
-      const res = await fetch(`${BASE_URL}/users/appointments?page=${currentPage}&limit=5`, {
+      const params = new URLSearchParams()
+      params.append('page', page)
+      params.append('limit', itemsPerPage)
+      params.append('completed', filterIsCompleted === 'completed' ? 'true' : 'false')
+      
+      // For cancelled filter, send explicit parameter
+      if (filterCancelled === 'cancelled') {
+        params.append('cancelled', 'true')
+      } else if (filterCancelled === 'not-cancelled') {
+        params.append('cancelled', 'false')
+      }
+
+      const res = await fetch(`${BASE_URL}/users/appointments?${params}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -198,10 +216,46 @@ export default function UserDashboard() {
       const data = await res.json();
       if (data.success) {
         setAppointments(data.appointments || []);
+        setTotalPages(data.totalPages || 1);
       }
     } catch (error) {
       console.error('Appointments error:', error);
       toast.error('Failed to load appointments');
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+
+    try {
+      setCancellingId(appointmentId);
+      const response = await fetch(`${BASE_URL}/users/cancel-appointment`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          appointmentId: appointmentId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to cancel appointment');
+      }
+
+      toast.success('Appointment cancelled successfully');
+      // Refresh appointments list
+      fetchAppointments(currentPage);
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      toast.error(error.message || 'Failed to cancel appointment');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -250,8 +304,8 @@ export default function UserDashboard() {
 
           <div className="border-t border-gray-700 pt-4">
             <button
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate('/');
                 toast.success('Logged out successfully');
               }}
@@ -585,7 +639,47 @@ export default function UserDashboard() {
 
           {/* Appointments Tab */}
           {activeTab === 'appointments' && (
-            <div className="space-y-4">
+            <div>
+              {/* Filters */}
+              <div className="mb-6 bg-gray-800/50 backdrop-blur border border-blue-500/30 rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-4 text-blue-300">Filters</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Status Filters */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Completion Status</label>
+                    <select
+                      value={filterIsCompleted}
+                      onChange={(e) => {
+                        setFilterIsCompleted(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="completed">Completed</option>
+                      <option value="not-completed">Not Completed</option>
+                    </select>
+                  </div>
+
+                  {/* Cancelled Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Cancelled Status</label>
+                    <select
+                      value={filterCancelled}
+                      onChange={(e) => {
+                        setFilterCancelled(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full px-4 py-2 bg-gray-700 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="cancelled">Cancelled</option>
+                      <option value="not-cancelled">Not Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Appointments List */}
+              <div className="space-y-4">
               {appointments.length === 0 ? (
                 <div className="bg-gray-800/50 backdrop-blur border border-blue-500/30 rounded-xl p-12 text-center">
                   <div className="text-4xl mb-4">📭</div>
@@ -633,31 +727,40 @@ export default function UserDashboard() {
                           <p className="text-white font-medium">{apt.docData?.experience} years</p>
                         </div>
                       </div>
+                      {!apt.cancelled && !apt.isCompleted && (
+                        <div className="mt-4 pt-4 border-t border-blue-500/20">
+                          <button
+                            onClick={() => handleCancelAppointment(apt._id)}
+                            disabled={cancellingId === apt._id}
+                            className="w-full px-4 py-2 bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/30 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {cancellingId === apt._id ? 'Cancelling...' : '❌ Cancel Appointment'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
 
                   {/* Pagination */}
                   {appointments.length > 0 && (
-                    <div className="flex justify-center gap-3 mt-8">
+                    <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
                       <button
                         onClick={() => {
                           if (currentPage > 1) {
-                            setCurrentPage(currentPage - 1);
+                            setCurrentPage(currentPage - 1)
                           }
                         }}
                         disabled={currentPage === 1}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-6 py-2 bg-gray-800 border border-blue-500/30 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-400 transition"
                       >
                         ← Previous
                       </button>
-                      <span className="px-4 py-3 bg-blue-600 text-white rounded-lg font-bold min-w-[50px] text-center">
-                        {currentPage}
+                      <span className="text-gray-400">
+                        Page <span className="text-blue-300 font-semibold">{currentPage}</span>
                       </span>
                       <button
-                        onClick={() => {
-                          setCurrentPage(currentPage + 1);
-                        }}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        className="px-6 py-2 bg-gray-800 border border-blue-500/30 rounded-lg hover:border-blue-400 transition"
                       >
                         Next →
                       </button>
@@ -665,6 +768,7 @@ export default function UserDashboard() {
                   )}
                 </>
               )}
+              </div>
             </div>
           )}
         </div>

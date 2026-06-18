@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import LocationSelector from './LocationSelector'
 import BASE_URL from '../constants/BASE_URL'
 
@@ -104,7 +105,7 @@ export default function Doctors() {
       setSelectedTime('')
     } catch (error) {
       console.error('Error fetching doctors:', error)
-      alert('Error fetching doctors. Please try again.')
+      toast.error('Error fetching doctors. Please try again.')
     } finally {
       setIsSearching(false)
     }
@@ -184,13 +185,13 @@ export default function Doctors() {
 
   const handleBookAppointment = async (doctor) => {
     if (!selectedDate || !selectedTime) {
-      alert('Please select date and time')
+      toast.error('Please select date and time')
       return
     }
 
     const key = `${doctor._id}-${selectedDate}-${selectedTime}`
     if (!slotAvailability[key]) {
-      alert('Selected slot is not available')
+      toast.error('Selected slot is not available')
       return
     }
 
@@ -216,7 +217,7 @@ export default function Doctors() {
       }
 
       // Success - show confirmation and navigate
-      alert('✓ Appointment booked successfully!')
+      toast.success('Appointment booked successfully!')
       
       sessionStorage.setItem('selectedDoctor', JSON.stringify(doctor))
       sessionStorage.setItem('appointmentDetails', JSON.stringify({
@@ -228,11 +229,11 @@ export default function Doctors() {
         fees: doctor.fees,
       }))
       
-      // Navigate to confirmation or dashboard
-      navigate('/dashboard')
+      // Navigate to appointments tab on dashboard
+      navigate('/dashboard?tab=appointments')
     } catch (error) {
       console.error('Error booking appointment:', error)
-      alert(`Error: ${error.message}`)
+      toast.error(error.message || 'Failed to book appointment')
     } finally {
       setBookingInProgress(false)
     }
