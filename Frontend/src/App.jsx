@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
@@ -7,52 +8,55 @@ import Navbar from './components/Navbar'
 import Home from './components/Home'
 import Login from './components/Login'
 import Signup from './components/Signup'
+import AdminLogin from './components/AdminLogin'
+import AdminDashboard from './components/AdminDashboard'
 import Doctors from './components/Doctors'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Dashboard from './components/Dashboard'
 import UserDashboard from './components/UserDashboard'
 import DoctorLogin from './components/DoctorLogin'
 import DoctorHome from './components/DoctorHome'
 import DoctorDashboard from './components/DoctorDashboard'
-import BASE_URL from './constants/BASE_URL'
+import About from './components/About'
+import Services from './components/Services'
 
-function AppContent() {
-  const { setUser, user, userType } = useAuth()
+function HashScrollHandler() {
+  const location = useLocation()
 
   useEffect(() => {
-    // If user is already in state (from localStorage), don't fetch again
-    if (user) {
+    if (!location.hash) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
 
-    const checkAuth = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/users/auth`, {
-          method: 'GET',
-          credentials: 'include'
-        })
-        const data = await response.json()
-        if (data.authenticated) {
-          setUser(data.user)
-        }
-      } catch (err) {
-        console.log('Auth check error:', err)
-      }
+    const sectionId = location.hash.replace('#', '')
+    const el = document.getElementById(sectionId)
+
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-    checkAuth()
-  }, [])
+  }, [location.pathname, location.hash])
+
+  return null
+}
+
+function AppContent() {
+  useAuth()
 
   return (
     <BrowserRouter>
+      <HashScrollHandler />
       <Navbar />
       <Routes>
         <Route path='/' element={<Home />} />
         <Route path='/home' element={<Home />} />
+        <Route path='/about' element={<About />} />
+        <Route path='/services' element={<Services />} />
         <Route path='/login' element={<Login />} />
         <Route path='/signup' element={<Signup />} />
+        <Route path='/admin-login' element={<AdminLogin />} />
+        <Route path='/admin-dashboard' element={<AdminDashboard />} />
         <Route path='/doctors' element={<Doctors />} />
         <Route path='/dashboard' element={<UserDashboard />} />
-        <Route path='/admin-dashboard/*' element={<Dashboard />} />
         <Route path='/doctor-login' element={<DoctorLogin />} />
         <Route path='/doctor-home' element={<DoctorHome />} />
         <Route path='/doctor-dashboard' element={<DoctorDashboard />} />
