@@ -9,7 +9,7 @@ const User = require("../models/userModel");
 
 const addDoctor = async(req, res) => {
     const {name, email,password,fees,experience,specialization,degree,address, gender} = req.body;
-    
+
     if(!name || !email || !password || !fees ||!experience || !specialization || !degree || !address || !gender){
         return res.status(400).json({
             success:false, 
@@ -47,13 +47,13 @@ const addDoctor = async(req, res) => {
         password:hashedPassword,
         fees,
         experience,
-        specialization:specialization.toLowerCase().trim(),
+        specialization:specialization.trim(),
         degree,
         address:{
-            city: address.city.toLowerCase().trim(),
-            state: address.state.toLowerCase().trim()
+            city: address.city.trim(),
+            state: address.state.trim()
         },
-        gender:gender.toLowerCase().trim()  
+        gender:gender.trim()  
     });
     await doctor.save();
     return res.status(201).json({
@@ -88,23 +88,29 @@ const allDoctors=async (req,res)=>{
     try{
         const page=parseInt(req.query.page) || 1;
         const limit=parseInt(req.query.limit) || 10;
-        const skip=(page-1)*limit;
+        const skip=(page-1)*limit;          
 
-        const total=await Doctor.countDocuments({});
-        const totalPages=Math.ceil(total/limit);
         const specialization_filter=req.query.specialization || "";
         const location_filter=req.query.location || "";
+        const docemail_filter=req.query.email || "";
+        
         
         const query={};
         if(specialization_filter?.trim()){
             query.specialization={$regex:specialization_filter.trim(), $options:'i'};
         }
-
+        
         if(location_filter?.trim()){
             query["address.city"]={$regex:location_filter.toLowerCase().trim(), $options:'i'};
         }
         
-        const doctors=await Doctor.find(query).skip(skip).limit(limit);
+        if(docemail_filter?.trim()){
+            query.email={$regex:docemail_filter.trim(), $options:'i'};
+        }
+        
+        const total=await Doctor.countDocuments(query);
+        const totalPages=Math.ceil(total/limit);
+        const doctors=await Doctor.find(query).skip(skip).limit(limit).select('-password -slots_booked -earning');
         res.json({
             success:true,
             doctors,
@@ -122,68 +128,75 @@ const allDoctors=async (req,res)=>{
     }
 }
 
-//api to get all apointments list
-const appointmentsAdmin = async (req, res)=>{
-    try {
-        const appointments= await Appointment.find({})
-        res.json({success:true, appointments})
-    } catch (error) {
-        console.log(error);
-        res.json({success: false, message:error.message})
-        
-        
+const removeDoctor = async (req, res) => {
+    try{
+        const {doctorEmail} = req.body;
+        if(!doctorEmail){
+            return res.status(400).json({
+                success:false,
+                message:"Doctor Email is required"
+            });
+        }
+        const doctor = await Doctor.findOneAndDelete({email: doctorEmail});   
+
+        if(!doctor){
+            return res.status(404).json({
+                success:false,
+                message:"Doctor not found"
+            });
+        }
+
+
+        res.json({success:true, message:"Doctor removed successfully"})
     }
-}
-
-const appointmentCancel = async (req, res)=>{
-
-    try {
-        const {appointmentId}= req.body
-        const appointmentData = await Appointment.findById(appointmentId)
-
-        await Appointment.findByIdAndUpdate(appointmentId, {cancelled: true})
-        
-
-        //releasing the cancelled appointment doctor slot
-
-        const {docId, slotDate, slotTime}= appointmentData
-
-        const doctorData= await doctorModel.findById(docId)
-
-
-        let slots_booked= doctorData.slots_booked
-
-        slots_booked[slotDate]=slots_booked[slotDate].filter(e=> e !== slotTime)
-
-        await doctorModel.findByIdAndUpdate(docId, {slots_booked})
-
-        res.json({success:true, message:"Appointment Cancelled"})
-
-    } catch (error) {
-         console.log(error);
-        res.json({success:false, message:error.message})   
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:"Error occured in removing doctor"
+        })
     }
-
 }
 
 const adminDashboard = async (req, res)=>{
-    try {
-        const doctors = await Doctor.find({})
-        const users= await User.find({})
-        const appointments = await Appointment.find({})
+try {
+        const totalDoctors = await Doctor.countDocuments();
+        const totalPatients = await User.countDocuments({});
+        const totalAppointments = await Appointment.countDocuments();
+        const cancelledAppointments = await Appointment.countDocuments({
+            cancelled: true
+        });
+        const completedAppointments = await Appointment.countDocuments({
+            isCompleted: true
+        });
 
-        const dashData= {
-            doctors: doctors.length,
-            appointments: appointments.length,
-            patients: users.length,
-            latestAppointments: appointments.reverse().slice(0,5)
-        }
-        res.json({success: true, dashData})
+        res.status(200).json({
+            totalDoctors,
+            totalPatients,
+            totalAppointments,
+            cancelledAppointments,
+            completedAppointments
+        });
 
-        
-    } catch (error) { 
-        console.log(error)
-        res.json({success: false, message: error.message})
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
     }
 }
-module.exports = { addDoctor,adminLogin ,allDoctors,appointmentCancel,appointmentsAdmin,adminDashboard};
+
+const adminLogout = async (req, res) => {
+    try{
+        res.clearCookie('token');
+        res.status(200).json({
+            success:true,
+            message:"Succesfully logout"
+        })
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:"Error occured in admin logout"
+        })
+    }
+}
+module.exports = { addDoctor,adminLogin ,allDoctors,removeDoctor,adminDashboard,adminLogout};

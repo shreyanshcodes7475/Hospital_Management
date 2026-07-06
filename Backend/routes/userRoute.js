@@ -7,7 +7,7 @@ const { upload } = require('../middleware/multer');
 
 userRouter.post('/register', registerUser);
 userRouter.post('/login', loginUser);
-userRouter.get('/logout', userAuth, LogoutUser);
+userRouter.post('/logout', userAuth, LogoutUser);
 userRouter.get('/auth', userAuth, isAuthenticated);
 userRouter.get('/profile', userAuth, getProfile);
 userRouter.patch('/edit', userAuth, editProfile);

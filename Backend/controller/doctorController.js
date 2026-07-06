@@ -111,7 +111,7 @@ const uploadProfilePicture=async(req,res)=>{
             height:500,
             crop:'fill'
         })
-        console.log(result);
+
         doctor.image=result.secure_url;
         await doctor.save();
         res.status(200).json({
@@ -258,8 +258,21 @@ try{
     }
 }
 
+const doctorLogout=async (req,res)=>{
+    try{
+        res.clearCookie('token');   
+        res.status(200).json({
+            success:true,
+            message:"Doctor logged out successfully"
+        })
+    }
+    catch(error){
+        res.status(500).json({
+            success:false,
+            message:"Error occured in doctor logout"
+        })
+    }
+}
 
-
-
-module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture,doctorDashboard };
+module.exports = { loginDoctor,getProfile,changeAvailability,updateProfile,appointmentList,appointmentComplete,appointmentCancel,uploadProfilePicture,doctorDashboard,doctorLogout}; 
 

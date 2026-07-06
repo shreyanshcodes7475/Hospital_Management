@@ -8,7 +8,7 @@ const { userRouter } = require('./routes/userRoute');
 const { doctorrouter } = require('./routes/doctorRoute'); 
 const { adminRouter } = require("./routes/adminRoute");
 const cors=require("cors")
-
+const multer = require('multer');
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow requests from this origin

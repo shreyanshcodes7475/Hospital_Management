@@ -1,5 +1,5 @@
 const express=require('express');   
-const { addDoctor,adminLogin ,allDoctors,appointmentCancel,appointmentsAdmin,adminDashboard }=require("../controller/admincontroller")
+const { addDoctor,adminLogin ,allDoctors,adminDashboard,adminLogout, removeDoctor }=require("../controller/admincontroller")
 const { adminAuth } = require('../middleware/adminAuth');
 
 
@@ -8,9 +8,10 @@ const  adminRouter =express.Router();
 adminRouter.post('/login',adminLogin);
 adminRouter.post('/add-doctor',adminAuth,addDoctor);
 adminRouter.get('/doctors',adminAuth,allDoctors);
-adminRouter.post('/cancel-appointment',adminAuth,appointmentCancel);
-adminRouter.get('/appointments',adminAuth,appointmentsAdmin);
+adminRouter.delete('/remove-doctor', adminAuth, removeDoctor);
 adminRouter.get('/dashboard',adminAuth,adminDashboard);
+adminRouter.post('/logout',adminAuth,adminLogout);
+
 
 
 module.exports={adminRouter};
